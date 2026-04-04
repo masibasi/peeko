@@ -1,284 +1,121 @@
-# Peeko — CLAUDE.md
-> Real-time lecture recovery system. Not a note-taking app — a recovery system.
+# CLAUDE.md
+> Agent operating instructions. Read this file before doing anything else.
 
 ---
 
-## Project Structure
+## Mandatory Session Initialization
 
-```
-peeko/
-├── CLAUDE.md
-├── README.md
-├── frontend/          # React + Vite + TailwindCSS
-└── backend/           # Node.js + WebSocket + Supabase + Claude API
-```
+Every session, before writing a single line of code, you MUST complete all four steps in order:
 
----
+**1. Read this file** (`CLAUDE.md`) in full.
 
-## What We're Building
+**2. Read the project docs:**
+- `docs/prd.md` — product requirements and scope
+- `docs/implementation_plan.md` — phases, tasks, technical decisions
+- `docs/changelog.md` — understand what has already changed and when
+- `docs/decisions.md` — understand what has already been decided and why
 
-Peeko listens to a live lecture, generates AI summary cards every 5 minutes, and gives students a one-tap "Catch Me Up" to rejoin when they've zoned out. A Picture-in-Picture fennec fox (Peeko) floats above any tab, showing live keyword bubbles from the current lecture.
+Do not ask questions already answered in these documents. Do not re-litigate decisions already logged in `decisions.md` unless the user explicitly reopens them.
 
-**Three Claude-powered features:**
-1. Rolling summarization — every 5 min transcript window → structured card (includes Q&A detection in same call)
-2. Catch Me Up — on-demand recovery guide (now / missed / read first / rejoin tip)
-3. Q&A detection — embedded in summarization call, not a separate pipeline
+**3. Audit the codebase and update `docs/progress.md`:**
+- Walk the directory tree
+- Compare what exists against the implementation plan
+- Update progress.md with accurate current state before touching any code
 
----
+**4. Verify environment hygiene:**
+- Confirm `.gitignore` exists and covers: `node_modules/`, `dist/`, `.env`, `.env.local`, build artifacts, OS files (`.DS_Store`, `Thumbs.db`)
+- Create or patch it if anything is missing
+- Never commit secrets, never hardcode API keys
 
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Frontend | React + Vite + TailwindCSS |
-| Backend | Node.js |
-| Database | Supabase (PostgreSQL) |
-| Auth | Supabase Auth — Google OAuth (login required) |
-| Transcription | Deepgram Streaming STT |
-| AI | Anthropic Claude API |
-| PiP | Document Picture-in-Picture API (Chrome 116+ only) |
-| Frontend deploy | Vercel |
-| Backend deploy | Railway or Render (WebSocket required — NOT Vercel) |
+Only after all four steps are complete should you acknowledge readiness and wait for the user's instruction.
 
 ---
 
-## Frontend
+## Tracking Documents
 
-### Routing
-```
-/                     → Landing page (login button)
-/login                → Google OAuth via Supabase
-/dashboard            → Past sessions grid
-/session/new          → Start new session
-/session/:id          → Active session view
-/session/:id/notebook → Post-session notebook
-```
+You are required to maintain three files in `docs/`. Update them proactively — not as an afterthought.
 
-### Session View Layout
-- Left sidebar (320px): scrollable card timeline
-- Center: live transcript (interim = grayed out, final = black)
-- Bottom bar: Catch Me Up button · Q&A input · Start/Pause/End · Open PiP button
-- Floating: Peeko PiP window (Document PiP API)
+### `docs/progress.md`
+- Update at the **start and end of every Phase**
+- Use checklists: `[ ]` pending, `[x]` complete, `[-]` in progress
+- Track: built, tested, pending — separately
+- Never mark something `[x]` unless it has a passing test
 
-### Peeko PiP Window
-- Always-on-top floating window via Document PiP API
-- Contains: Peeko character (calm / alert) + keyword bubbles
-- Keyword source: `keywords` array from latest summary card
-- Bubbles fade in one by one with CSS animation when new card arrives
-- Old bubbles fade out when new keywords replace them
-- Click Peeko in PiP → triggers Catch Me Up
-- Peeko switches to alert state when Catch Me Up is triggered (both main UI and PiP update simultaneously)
+### `docs/changelog.md`
+- Update **immediately** after creating, modifying, or deleting any file
+- Use [Keep a Changelog](https://keepachangelog.com) format: `Added`, `Changed`, `Removed`, `Fixed`
+- Group by date
 
-```
-┌─────────────────────┐
-│                     │
-│   🦊 Peeko          │
-│                     │
-│  [gradient descent] │
-│    [learning rate]  │
-│  [cost function]    │
-│                     │
-└─────────────────────┘
-```
-
-### Frontend Responsibilities
-- Mic capture via `getUserMedia` → WebSocket stream to backend
-- Display live interim transcript (NOT stored)
-- Run 5-min timer → `POST /session/:id/generate-card` (session ID only, no transcript)
-- Poll `GET /session/:id/cards` every 3s → render new cards
-- On new card: push latest `keywords` to PiP window → animate bubbles
-- On Catch Me Up triggered: switch Peeko to alert state in both main UI and PiP
-- Send Catch Me Up and Q&A requests on user action
-
-### Frontend Does NOT Handle
-- Transcript storage
-- Card generation logic
-- LLM calls
-- Deepgram API key
+### `docs/decisions.md`
+- Record any decision not explicitly defined in the implementation plan
+- Format: **Decision** → **Why** → **Trade-offs considered**
+- Covers: library choices, schema changes, prompt design, API shape, styling strategy, test approach
 
 ---
 
-## Backend
+## Workflow Rules
 
-### Audio & Transcription Flow
-```
-Browser → WebSocket → Backend → Deepgram
-                              ↓
-                    Interim → Frontend only (not stored)
-                    Final   → Supabase DB
-```
+### Test-Driven Development
+- Write failing tests **before** writing implementation code — no exceptions
+- Tests must verify the specific behavior described in the PRD
+- Do not mark a task complete in progress.md until its tests pass
+- Use the test runner already configured in the project; do not swap it without a decision log entry
 
-### Card Generation Flow
-```
-Frontend timer (5 min)
-→ POST /session/:id/generate-card
-→ Query transcript since last checkpoint
-→ Word count check (skip if < 100 words — silence/announcements)
-→ Build prompt: [all previous cards] + [new transcript window]
-→ Claude API → card JSON
-→ Save to DB with transcript_from + transcript_to
-→ Frontend polls → renders card + updates PiP keywords
-```
+### Phase Discipline
+- Execute only the Phase the user has requested
+- Do not build ahead — no "I'll scaffold this while I'm here"
+- If a future phase dependency is discovered, log it in decisions.md and flag it to the user; do not implement it
 
-### API Endpoints
-```
-POST   /session/start              Create session, return session_id
-POST   /session/:id/end            End session, trigger final card (no word count guard)
-WS     /session/:id/audio          Receive audio, proxy to Deepgram, store transcript
-POST   /session/:id/generate-card  Timer-triggered card generation
-POST   /session/:id/catch-me-up    On-demand recovery summary
-GET    /session/:id/cards          Poll for latest cards
-GET    /session/:id/notebook       Full session notebook
-```
-
-### Edge Cases
-- **Disconnect**: reconnect with existing `session_id`, resume from last chunk
-- **Card gen failure**: checkpoint does not advance, window merges into next interval
-- **Silence**: word count guard skips, window merges into next interval
-- **Final card**: always generated on session end, no word count guard
-- **Concurrency**: Catch Me Up runs independently from card generation queue
+### No Hallucinated Integrations
+- Do not invent `fetch()` calls, backend routes, or database queries that don't exist yet
+- If the backend isn't built, use clearly-labeled mock data or stubs — never silent fakes that look real
+- All stubs must be marked with a `// STUB` comment and logged in decisions.md
 
 ---
 
-## Database Schema
+## Full-Stack Conventions
 
-### Sessions
-```sql
-session_id    UUID PRIMARY KEY
-user_id       UUID FK → Supabase Auth
-started_at    TIMESTAMPTZ
-ended_at      TIMESTAMPTZ  -- null until ended
-status        TEXT  -- 'active' | 'paused' | 'ended' | 'disconnected'
-```
+### Frontend
+- Mobile-first by default; add responsive breakpoints for desktop where the PRD specifies
+- No default HTML button/input styling — every interactive element must be explicitly styled
+- No inline styles unless dynamically computed; use CSS variables or utility classes
 
-### Transcript Chunks
-```sql
-chunk_id      UUID PRIMARY KEY
-session_id    UUID FK
-text          TEXT
-timestamp     TIMESTAMPTZ
-is_final      BOOLEAN  -- always true, only final Deepgram results stored
-```
+### Backend
+- All environment variables via `.env` — never hardcoded
+- Every API endpoint must have a corresponding test before it is considered done
+- Clearly separate: routing → validation → business logic → data access
 
-### Cards
-```sql
-card_id           UUID PRIMARY KEY
-session_id        UUID FK
-type              TEXT  -- 'summary' | 'catchmeup'
-content           JSONB  -- full card JSON
-generated_at      TIMESTAMPTZ
-transcript_from   TIMESTAMPTZ
-transcript_to     TIMESTAMPTZ
-interval_number   INTEGER
-```
+### Database
+- Schema changes require a migration file — never mutate the DB directly in dev and call it done
+- Migration files are append-only; never edit a migration that has already run
 
 ---
 
-## Claude API — Prompt Specs
+## Out of Scope Enforcement
 
-### 1. Summary Card (every 5 min)
-
-**Input:**
-```
-System: You are a lecture assistant. Return ONLY valid JSON. No preamble, no markdown.
-
-Previous cards (session memory):
-{all_cards_so_far}
-
-New transcript (last 5 minutes):
-{transcript_window}
-
-Generate the next summary card. Capture key concepts and 2-3 bullet points.
-If the professor asked a question and answered it in this window, include it in the qa array.
-If no Q&A detected, return qa as an empty array [].
-```
-
-**Output schema:**
-```json
-{
-  "type": "summary",
-  "title": "string",
-  "bullets": ["string", "string", "string"],
-  "keywords": ["string"],
-  "qa": [
-    { "question": "string", "answer": "string" }
-  ],
-  "timestamp": "ISO string"
-}
-```
+If the user requests something listed as out of scope in `docs/prd.md`:
+1. Flag it explicitly: *"This is marked out of scope in the PRD."*
+2. Do not implement it
+3. Ask whether the PRD should be updated before proceeding
 
 ---
 
-### 2. Catch Me Up (on demand)
+## Acknowledgment Format
 
-**Input:**
+At the end of session initialization, respond with exactly:
+
 ```
-System: You are a lecture recovery assistant. Return ONLY valid JSON. No preamble, no markdown.
+Session initialized.
+- docs/prd.md ✓
+- docs/implementation_plan.md ✓
+- docs/changelog.md ✓
+- docs/decisions.md ✓
+- Codebase audited — docs/progress.md updated ✓
+- .gitignore verified ✓
 
-Cards generated so far:
-{all_cards}
+Current phase: [Phase N — Name]
+Last completed task: [task name or "none"]
+Next task: [task name]
 
-Transcript since last card checkpoint:
-{transcript_since_checkpoint}
-
-The student just snapped back to attention. Generate a recovery response:
-- now: what the professor is currently discussing
-- missed: key concepts the student likely missed
-- read_first: array of card interval_numbers most relevant to rejoin
-- rejoin_tip: the minimum context needed to follow along right now
+Ready for your instruction.
 ```
-
-**Output schema:**
-```json
-{
-  "type": "catchmeup",
-  "now": "string",
-  "missed": "string",
-  "read_first": [1, 2],
-  "rejoin_tip": "string",
-  "timestamp": "ISO string"
-}
-```
-
----
-
-## Catch Me Up — Save Behavior
-- Default: transient overlay, disappears on dismiss
-- If student taps "Save": appended to bottom of timeline as a card
-- Saved position: always appended at the end, not inserted at trigger timestamp
-
----
-
-## Peeko States
-| State | Trigger |
-|---|---|
-| Calm | Default — session active |
-| Alert | Catch Me Up triggered |
-
-- 2 states only — asset format (CSS animation or Lottie) decided at implementation time
-- Zero logic — no distraction scoring, no tab tracking, no inactivity detection
-
----
-
-## Auth
-- Google OAuth via Supabase Auth
-- Login required — no anonymous sessions
-- Multi-device supported automatically via DB
-
----
-
-## Out of Scope (Do Not Build)
-- Distraction nudges
-- Advanced Peeko states (fidgety, puffed up)
-- Tab visibility / blacklist detection
-- PDF upload for pre-session context
-- Gamification (streaks, quests)
-- Anki / flashcard export
-- Auto class grouping
-- Rate limiting
-- Data retention policies
-
----
-
-## Hackathon Track
-**Design — Human-Centric AI** (Build4SC 2025)
