@@ -3,9 +3,10 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Sessions
+-- user_id has no FK to auth.users so demo mode works without real auth
 CREATE TABLE sessions (
   session_id  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id     UUID NOT NULL REFERENCES auth.users(id),
+  user_id     UUID NOT NULL,
   started_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   ended_at    TIMESTAMPTZ,
   status      TEXT NOT NULL DEFAULT 'active'
