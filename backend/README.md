@@ -2,6 +2,28 @@
 
 Node.js + Express + WebSocket backend for Peeko — a real-time lecture recovery system.
 
+## Team & Role Division
+
+All backend code is written. The remaining work is testing, deployment, and integration support.
+
+### Person A — Infrastructure & Testing
+- Create Supabase project and run `supabase-migration.sql`
+- Fill in `.env` and run the server locally (`npm run dev`)
+- Run the end-to-end curl test script (see below) to verify each endpoint works with real API keys
+- Fix any bugs that come up during testing
+
+### Person B — Deployment & Frontend Integration
+- Deploy to Railway or Render (see Deployment section below)
+- Set production environment variables on the platform dashboard
+- Add the Vite proxy config to the frontend so it routes to the backend
+- Be the point of contact when the frontend team hits backend errors — fix and redeploy
+
+### Shared
+- If real Google OAuth is needed later: enable Google provider in Supabase dashboard and set `AUTH_REQUIRED=true`
+- Until then, keep `AUTH_REQUIRED=false` for demo mode — no login required
+
+---
+
 ## What's Implemented
 
 | Feature | Status |
