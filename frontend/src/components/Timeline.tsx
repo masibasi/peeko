@@ -1,4 +1,3 @@
-import { useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -6,20 +5,8 @@ import { format } from 'date-fns';
 export function Timeline() {
   const { flashcards, addXp, updateQuestProgress } = useStore();
 
-  const summaryEndRef = useRef<HTMLDivElement>(null);
-  const catchupEndRef = useRef<HTMLDivElement>(null);
-
-  const summaryCards = flashcards.filter(c => c.type !== 'catchup' && c.type !== 'catchmeup');
-  const catchupCards = flashcards.filter(c => c.type === 'catchup' || c.type === 'catchmeup');
-
-  // Auto-scroll to bottom when new cards arrive
-  useEffect(() => {
-    summaryEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [summaryCards.length]);
-
-  useEffect(() => {
-    catchupEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [catchupCards.length]);
+  const summaryCards = flashcards.filter(c => c.type !== 'catchup' && c.type !== 'catchmeup').slice().reverse();
+  const catchupCards = flashcards.filter(c => c.type === 'catchup' || c.type === 'catchmeup').slice().reverse();
 
   const handleQaAnswer = (id: string, correct: boolean) => {
     if (correct) {
@@ -181,7 +168,6 @@ export function Timeline() {
                 </p>
               </motion.div>
             )}
-            <div ref={summaryEndRef} />
           </div>
         </div>
 
@@ -218,7 +204,6 @@ export function Timeline() {
                 </p>
               </motion.div>
             )}
-            <div ref={catchupEndRef} />
           </div>
         </div>
 
