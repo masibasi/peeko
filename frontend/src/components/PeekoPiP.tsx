@@ -100,7 +100,7 @@ export function PeekoPiP({ isSessionActive, transcript = '' }: PeekoPiPProps) {
 
     if (foxEl) {
       foxEl.textContent = getFoxEmoji();
-      foxEl.className = `text-6xl ${getPeekoAnimation()}`;
+      foxEl.className = `fox ${getPeekoAnimation()}`;
     }
     if (stateEl) {
       stateEl.textContent = `Lvl ${level} • ${peekoState}`;
@@ -155,8 +155,8 @@ export function PeekoPiP({ isSessionActive, transcript = '' }: PeekoPiPProps) {
           text-align: center;
         }
         .fox {
-          font-size: 80px;
-          margin-bottom: 16px;
+          font-size: 20px;
+          margin-bottom: 8px;
         }
         .state {
           font-size: 14px;
