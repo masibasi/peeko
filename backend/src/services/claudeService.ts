@@ -26,7 +26,9 @@ If the professor asked a question and answered it in this window, include it in 
 If no Q&A detected, return qa as an empty array [].`;
 
   const system =
-    'You are a lecture assistant. Return ONLY valid JSON. No preamble, no markdown.';
+    'You are a lecture assistant. Return ONLY valid JSON matching this exact schema — no preamble, no markdown, no extra fields:\n' +
+    '{"type":"summary","title":"string","bullets":["string"],"keywords":["string"],"qa":[{"question":"string","answer":"string"}],"timestamp":"ISO string"}\n' +
+    'Use "bullets" (not bullet_points) and "keywords" (not key_concepts).';
 
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',

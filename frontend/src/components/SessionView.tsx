@@ -86,8 +86,8 @@ export function SessionView() {
               front: card.type === 'catchmeup' ? (card.content?.now || 'Catch Me Up') : (card.content?.title || 'Summary'),
               back: card.type === 'catchmeup'
                 ? [card.content?.missed, card.content?.rejoin_tip].filter(Boolean)
-                : card.content?.bullets || [],
-              keywords: card.content?.keywords || [],
+                : (card.content?.bullets || card.content?.bullet_points || []),
+              keywords: card.content?.keywords || card.content?.key_concepts || [],
               importance: card.type === 'catchmeup' ? 'high' : 'medium',
               type: card.type === 'catchmeup' ? 'catchup' : 'flashcard',
             });
