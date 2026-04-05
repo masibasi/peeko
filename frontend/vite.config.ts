@@ -8,17 +8,34 @@ export default defineConfig(({mode}) => {
   return {
     plugins: [react(), tailwindcss()],
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'process.env.Claude_API_KEY': JSON.stringify(env.Claude_API_KEY),
     },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        'zustand',
+        'motion/react',
+        'lucide-react',
+        'date-fns',
+        'clsx',
+        'tailwind-merge',
+      ],
+    },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
+      warmup: {
+        clientFiles: ['./src/App.tsx', './src/main.tsx'],
+      },
+    },
+    build: {
+      target: 'esnext',
+      minify: 'esbuild',
     },
   };
 });

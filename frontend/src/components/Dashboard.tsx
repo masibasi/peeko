@@ -1,496 +1,319 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../store/useStore';
-import { api } from '../lib/api';
-import { Mic, MicOff, MessageSquare, RefreshCw, ExternalLink, BookOpen, LayoutList } from 'lucide-react';
-import { format } from 'date-fns';
+import { motion } from 'motion/react';
+import { Plus, Clock, FileText, LogOut, Calendar, ChevronRight, Search, Flame, Zap, Target, Trophy } from 'lucide-react';
+
+interface Session {
+  id: string;
+  title: string;
+  createdAt: string;
+  duration: number; // in minutes
+  cardCount: number;
+}
 
 export function Dashboard() {
-  const { 
-    sessionId, isRecording, transcripts, cards, interimTranscript,
-    setSessionId, setIsRecording, setInterimTranscript, addTranscript, addCard
-  } = useStore();
-
-  const [question, setQuestion] = useState('');
-  const [isAsking, setIsAsking] = useState(false);
-  const [isCatchingUp, setIsCatchingUp] = useState(false);
-  const [view, setView] = useState<'live' | 'notebook'>('live');
-  
-  const recognitionRef = useRef<any>(null);
-  const cardIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
-  const cardsEndRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll
-  useEffect(() => {
-    if (view === 'live') {
-      transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [transcripts, interimTranscript, view]);
+  const { user, logout } = useAuth();
+  const { xp, level, recoveryStreak, quests } = useStore();
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    if (view === 'live') {
-      cardsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [cards, view]);
+    fetchSessions();
+  }, []);
 
-  const startRecording = async () => {
+  const fetchSessions = async () => {
     try {
-      const { session_id } = await api.startSession();
-      setSessionId(session_id);
-      setIsRecording(true);
-      setView('live');
-
-      // Initialize Web Speech API
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        recognition.onresult = async (event: any) => {
-          let interim = '';
-          let final = '';
-
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              final += event.results[i][0].transcript;
-            } else {
-              interim += event.results[i][0].transcript;
-            }
-          }
-
-          setInterimTranscript(interim);
-
-          if (final.trim()) {
-            const chunk = {
-              chunk_id: Math.random().toString(),
-              session_id,
-              text: final.trim(),
-              timestamp: Date.now(),
-              is_final: true
-            };
-            addTranscript(chunk);
-            await api.sendTranscript(session_id, final.trim(), true);
-          }
-        };
-
-        recognition.onerror = (event: any) => {
-          console.error('Speech recognition error', event.error);
-        };
-
-        recognition.onend = () => {
-          // Restart if still supposed to be recording
-          if (useStore.getState().isRecording) {
-            recognition.start();
-          }
-        };
-
-        recognition.start();
-        recognitionRef.current = recognition;
-      } else {
-        alert("Speech Recognition API not supported in this browser.");
+      const res = await fetch('/api/sessions');
+      if (res.ok) {
+        const data = await res.json();
+        setSessions(data.sessions || []);
       }
-
-      // Start 5-minute interval for card generation
-      cardIntervalRef.current = setInterval(async () => {
-        const res = await api.generateCard(session_id);
-        if (res.success && res.card) {
-          addCard(res.card);
-          updatePipWindow();
-        }
-      }, 5 * 60 * 1000); // 5 minutes
-
-    } catch (error) {
-      console.error("Failed to start session:", error);
-    }
-  };
-
-  const stopRecording = async () => {
-    setIsRecording(false);
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
-    if (cardIntervalRef.current) {
-      clearInterval(cardIntervalRef.current);
-    }
-    if (sessionId) {
-      // Generate final card
-      const res = await api.generateCard(sessionId);
-      if (res.success && res.card) {
-        addCard(res.card);
-      }
-      await api.endSession(sessionId);
-      setView('notebook');
-    }
-  };
-
-  const handleAsk = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!question.trim() || !sessionId || isAsking) return;
-    
-    setIsAsking(true);
-    try {
-      const res = await api.askQuestion(sessionId, question);
-      if (res.success && res.card) {
-        addCard(res.card);
-        setQuestion('');
-        updatePipWindow();
-      }
-    } catch (error) {
-      console.error("Failed to ask question:", error);
+    } catch (err) {
+      console.error('Failed to fetch sessions:', err);
     } finally {
-      setIsAsking(false);
+      setLoading(false);
     }
   };
 
-  const handleCatchMeUp = async () => {
-    if (!sessionId || isCatchingUp) return;
+  const handleNewSession = () => {
+    window.location.href = '/session/new';
+  };
+
+  const handleSessionClick = (sessionId: string) => {
+    window.location.href = `/session/${sessionId}`;
+  };
+
+  const handleLogout = () => {
+    logout();
+    window.location.href = '/';
+  };
+
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     
-    setIsCatchingUp(true);
-    try {
-      const res = await api.catchMeUp(sessionId);
-      if (res.success && res.card) {
-        addCard(res.card);
-        updatePipWindow();
-      }
-    } catch (error) {
-      console.error("Failed to catch up:", error);
-    } finally {
-      setIsCatchingUp(false);
-    }
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return `${days} days ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  // Picture-in-Picture Support
-  const pipWindowRef = useRef<any>(null);
-
-  const openPiP = async () => {
-    if (!('documentPictureInPicture' in window)) {
-      alert("Document Picture-in-Picture API is not supported in this browser. Try Chrome or Edge.");
-      return;
-    }
-
-    try {
-      const pipWindow = await (window as any).documentPictureInPicture.requestWindow({
-        width: 400,
-        height: 500,
-      });
-
-      pipWindowRef.current = pipWindow;
-
-      // Copy styles
-      [...document.styleSheets].forEach((styleSheet) => {
-        try {
-          const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('');
-          const style = document.createElement('style');
-          style.textContent = cssRules;
-          pipWindow.document.head.appendChild(style);
-        } catch (e) {
-          const link = document.createElement('link');
-          link.rel = 'stylesheet';
-          link.type = styleSheet.type;
-          link.media = styleSheet.media.mediaText;
-          link.href = styleSheet.href || '';
-          pipWindow.document.head.appendChild(link);
-        }
-      });
-      
-      pipWindow.document.body.innerHTML = `
-        <div class="p-4 h-full flex flex-col bg-gray-50 font-sans">
-          <div class="flex items-center justify-between mb-4 pb-2 border-b border-gray-200">
-            <h3 class="font-bold text-gray-900 flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-              ClassMate AI
-            </h3>
-          </div>
-          
-          <div class="flex-1 overflow-y-auto mb-4" id="pip-cards">
-            <!-- Cards will be injected here -->
-          </div>
-          
-          <div class="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
-            <p class="text-xs font-bold text-gray-500 mb-1 uppercase">Live Transcript</p>
-            <p class="text-sm text-gray-700 italic" id="pip-transcript">Listening...</p>
-          </div>
-        </div>
-      `;
-
-      pipWindow.addEventListener("pagehide", () => {
-        pipWindowRef.current = null;
-      });
-
-      updatePipWindow();
-
-    } catch (error) {
-      console.error("Failed to open PiP:", error);
-    }
-  };
-
-  const updatePipWindow = () => {
-    if (!pipWindowRef.current) return;
-    
-    const pipDoc = pipWindowRef.current.document;
-    
-    // Update transcript
-    const transcriptEl = pipDoc.getElementById('pip-transcript');
-    if (transcriptEl) {
-      const latestText = interimTranscript || (transcripts.length > 0 ? transcripts[transcripts.length - 1].text : 'Listening...');
-      transcriptEl.textContent = latestText;
-    }
-
-    // Update cards (show latest)
-    const cardsEl = pipDoc.getElementById('pip-cards');
-    if (cardsEl && cards.length > 0) {
-      const latestCard = cards[cards.length - 1];
-      cardsEl.innerHTML = `
-        <div class="bg-white p-4 rounded-xl shadow-sm border ${
-          latestCard.type === 'qa' ? 'border-purple-200 bg-purple-50' :
-          latestCard.type === 'catchmeup' ? 'border-orange-200 bg-orange-50' :
-          'border-blue-200 bg-blue-50'
-        }">
-          <div class="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider">
-            ${latestCard.type === 'qa' ? 'Q&A' : latestCard.type === 'catchmeup' ? 'Catch Up' : 'Summary'}
-          </div>
-          <h4 class="font-bold text-gray-900 mb-2">${latestCard.content.title}</h4>
-          <ul class="space-y-1">
-            ${latestCard.content.bullets.map((b: string) => `<li class="text-sm text-gray-700 flex gap-2"><span class="text-gray-400">•</span>${b}</li>`).join('')}
-          </ul>
-        </div>
-      `;
-    }
-  };
-
-  // Sync PiP transcript continuously
-  useEffect(() => {
-    updatePipWindow();
-  }, [interimTranscript, transcripts, cards]);
-
-  if (view === 'notebook') {
-    return (
-      <div className="min-h-screen bg-gray-50 font-sans p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <BookOpen className="w-8 h-8 text-blue-600" />
-              Class Notebook
-            </h1>
-            <button
-              onClick={() => setView('live')}
-              className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition-colors"
-            >
-              Back to Live View
-            </button>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-8 border-b border-gray-100 bg-blue-50/50">
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Lecture Summary</h2>
-              <p className="text-gray-500 text-sm">Generated on {format(new Date(), 'MMMM d, yyyy')}</p>
-            </div>
-            
-            <div className="p-8 space-y-8">
-              {cards.filter(c => c.type === 'card').map((card, idx) => (
-                <div key={card.card_id} className="relative">
-                  {idx !== 0 && <div className="absolute -top-8 left-4 w-px h-8 bg-gray-200" />}
-                  <div className="flex gap-4">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm shrink-0 z-10 relative">
-                      {idx + 1}
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-3">{card.content.title}</h3>
-                      <ul className="space-y-2 mb-4">
-                        {card.content.bullets.map((bullet, i) => (
-                          <li key={i} className="flex items-start gap-2 text-gray-700">
-                            <span className="text-blue-400 mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"></span>
-                            <span>{bullet}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      {card.content.keywords && card.content.keywords.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {card.content.keywords.map((kw, i) => (
-                            <span key={i} className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
-                              {kw}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {cards.length === 0 && (
-                <div className="text-center text-gray-500 py-12">
-                  No summary cards generated yet.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const filteredSessions = sessions.filter(session =>
+    session.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <div className="flex h-screen bg-gray-100 font-sans">
-      {/* Left Panel: Transcript */}
-      <div className="w-1/3 flex flex-col bg-white border-r border-gray-200 shadow-sm z-10">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-white">
-          <h2 className="font-bold text-lg text-gray-900 flex items-center gap-2">
-            <Mic className={`w-5 h-5 ${isRecording ? 'text-red-500 animate-pulse' : 'text-gray-400'}`} />
-            Live Transcript
-          </h2>
-          <div className="flex gap-2">
-            {cards.length > 0 && (
-              <button
-                onClick={() => setView('notebook')}
-                className="px-3 py-2 rounded-lg font-medium text-sm text-gray-600 hover:bg-gray-100 transition-colors"
-                title="View Notebook"
-              >
-                <LayoutList className="w-5 h-5" />
-              </button>
-            )}
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">🦊</span>
+            <span className="text-xl font-bold text-gray-900">Peeko</span>
+          </div>
+          
+          {/* XP Bar */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm font-medium bg-gray-100 px-4 py-2 rounded-full">
+              <span className="text-orange-500">Lvl {level}</span>
+              <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-orange-500 transition-all" 
+                  style={{ width: `${(xp % 300) / 3}%` }}
+                />
+              </div>
+              <span className="text-gray-500">{xp} XP</span>
+            </div>
+            <div className="flex items-center gap-1 text-orange-500 font-medium">
+              <Flame className="w-5 h-5" />
+              <span>{recoveryStreak}</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              {user?.picture ? (
+                <img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full" />
+              ) : (
+                <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                  <span className="text-orange-600 font-medium text-sm">
+                    {user?.name?.charAt(0) || user?.email?.charAt(0) || '?'}
+                  </span>
+                </div>
+              )}
+              <span className="text-sm text-gray-700 hidden sm:block">{user?.name || user?.email}</span>
+            </div>
             <button
-              onClick={isRecording ? stopRecording : startRecording}
-              className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                isRecording 
-                  ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200' 
-                  : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
-              }`}
+              onClick={handleLogout}
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Logout"
             >
-              {isRecording ? 'End Session' : 'Start Session'}
+              <LogOut className="w-5 h-5" />
             </button>
           </div>
         </div>
-        
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {!isRecording && transcripts.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400">
-              <MicOff className="w-12 h-12 mb-4 opacity-20" />
-              <p>Start a session to begin transcribing.</p>
-            </div>
-          )}
-          
-          {transcripts.map((t) => (
-            <div key={t.chunk_id} className="text-gray-800 leading-relaxed">
-              <span className="text-xs text-gray-400 mr-2 select-none">
-                {format(t.timestamp, 'HH:mm')}
-              </span>
-              {t.text}
-            </div>
-          ))}
-          
-          {interimTranscript && (
-            <div className="text-gray-500 italic leading-relaxed">
-              {interimTranscript}
-            </div>
-          )}
-          <div ref={transcriptEndRef} />
-        </div>
-      </div>
+      </header>
 
-      {/* Right Panel: Cards & Actions */}
-      <div className="flex-1 flex flex-col bg-gray-50 relative">
-        {/* Header Actions */}
-        <div className="absolute top-4 right-4 flex gap-2 z-20">
-          <button
-            onClick={openPiP}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition-colors"
-          >
-            <ExternalLink className="w-4 h-4" />
-            Pop Out (PiP)
-          </button>
-          <button
-            onClick={handleCatchMeUp}
-            disabled={!isRecording || isCatchingUp}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-bold hover:bg-orange-600 shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw className={`w-4 h-4 ${isCatchingUp ? 'animate-spin' : ''}`} />
-            Catch Me Up
-          </button>
-        </div>
-
-        {/* Cards Area */}
-        <div className="flex-1 overflow-y-auto p-8 pt-20">
-          <div className="max-w-3xl mx-auto space-y-6">
-            {cards.length === 0 && (
-              <div className="text-center text-gray-400 mt-20">
-                <BookOpen className="w-16 h-16 mx-auto mb-4 opacity-20" />
-                <p className="text-lg">AI Summary Cards will appear here.</p>
-                <p className="text-sm mt-2">Cards are generated automatically every 5 minutes.</p>
+      {/* Main Content */}
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        {/* Welcome & Stats Section */}
+        <div className="grid lg:grid-cols-3 gap-6 mb-8">
+          <div className="lg:col-span-2">
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-2xl p-6 border border-gray-100"
+            >
+              <div className="flex items-center gap-4 mb-4">
+                <div className="text-5xl">🦊</div>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">
+                    Hey{user?.name ? `, ${user.name.split(' ')[0]}` : ''}! Ready to focus?
+                  </h1>
+                  <p className="text-gray-600">You're on a {recoveryStreak} recovery streak. Keep it up!</p>
+                </div>
               </div>
-            )}
-
-            {cards.map((card) => (
-              <div 
-                key={card.card_id} 
-                className={`p-6 rounded-2xl shadow-sm border ${
-                  card.type === 'qa' ? 'bg-purple-50 border-purple-100' :
-                  card.type === 'catchmeup' ? 'bg-orange-50 border-orange-100' :
-                  'bg-white border-gray-200'
-                }`}
+              <button
+                onClick={handleNewSession}
+                className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-bold transition-colors shadow-lg shadow-orange-200 w-full sm:w-auto"
               >
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-md inline-block ${
-                    card.type === 'qa' ? 'bg-purple-200 text-purple-800' :
-                    card.type === 'catchmeup' ? 'bg-orange-200 text-orange-800' :
-                    'bg-blue-100 text-blue-800'
-                  }`}>
-                    {card.type === 'qa' ? 'Q&A' : card.type === 'catchmeup' ? 'Catch Up' : 'Summary'}
+                <Plus className="w-5 h-5" />
+                Start New Session
+              </button>
+            </motion.div>
+          </div>
+          
+          {/* Daily Quests */}
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-white rounded-2xl p-6 border border-gray-100"
+          >
+            <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-4">
+              <Target className="w-5 h-5 text-blue-500" /> Daily Quests
+            </h3>
+            <div className="space-y-3">
+              {quests.length > 0 ? quests.slice(0, 3).map(q => (
+                <div key={q.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${q.completed ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300'}`}>
+                      {q.completed && <span className="text-xs">✓</span>}
+                    </div>
+                    <span className={`text-sm ${q.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                      {q.title}
+                    </span>
                   </div>
-                  <span className="text-xs text-gray-400 font-medium">
-                    {format(card.generated_at, 'HH:mm')}
+                  <span className="text-xs font-bold text-orange-500">+{q.xp} XP</span>
+                </div>
+              )) : (
+                <p className="text-sm text-gray-500">Start a session to get quests!</p>
+              )}
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white rounded-xl p-4 border border-gray-100 text-center"
+          >
+            <Zap className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-gray-900">{xp}</div>
+            <div className="text-xs text-gray-500 uppercase tracking-wider">Total XP</div>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white rounded-xl p-4 border border-gray-100 text-center"
+          >
+            <Trophy className="w-6 h-6 text-purple-500 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-gray-900">{level}</div>
+            <div className="text-xs text-gray-500 uppercase tracking-wider">Level</div>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white rounded-xl p-4 border border-gray-100 text-center"
+          >
+            <Flame className="w-6 h-6 text-orange-500 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-gray-900">{recoveryStreak}</div>
+            <div className="text-xs text-gray-500 uppercase tracking-wider">Streak</div>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.5 }}
+            className="bg-white rounded-xl p-4 border border-gray-100 text-center"
+          >
+            <FileText className="w-6 h-6 text-green-500 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-gray-900">{sessions.length}</div>
+            <div className="text-xs text-gray-500 uppercase tracking-wider">Sessions</div>
+          </motion.div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search sessions..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
+            />
+          </div>
+        </div>
+
+        {/* Sessions Grid */}
+        <h2 className="font-bold text-gray-900 mb-4">Past Sessions</h2>
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+          </div>
+        ) : filteredSessions.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+            <div className="text-6xl mb-4">🦊</div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {sessions.length === 0 ? 'No sessions yet' : 'No matching sessions'}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {sessions.length === 0 
+                ? 'Start your first lecture session to earn XP!'
+                : 'Try a different search term'
+              }
+            </p>
+            {sessions.length === 0 && (
+              <button
+                onClick={handleNewSession}
+                className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-bold transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                Start First Session
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredSessions.map((session) => (
+              <motion.button
+                key={session.id}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                onClick={() => handleSessionClick(session.id)}
+                className="bg-white rounded-2xl p-6 text-left hover:shadow-lg transition-all duration-200 border border-gray-100 group"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-2xl">
+                    🦊
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-500 transition-colors" />
+                </div>
+                
+                <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
+                  {session.title}
+                </h3>
+                
+                <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-4 h-4" />
+                    {formatDate(session.createdAt)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    {formatDuration(session.duration)}
                   </span>
                 </div>
                 
-                <h3 className="text-xl font-bold text-gray-900 mb-4">{card.content.title}</h3>
-                
-                <ul className="space-y-3 mb-6">
-                  {card.content.bullets.map((bullet, i) => (
-                    <li key={i} className="flex items-start gap-3 text-gray-700">
-                      <span className="text-gray-300 mt-1">•</span>
-                      <span className="leading-relaxed">{bullet}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                {card.content.keywords && card.content.keywords.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100/50">
-                    {card.content.keywords.map((kw, i) => (
-                      <span key={i} className="text-xs font-medium text-gray-500 bg-gray-100/50 px-2 py-1 rounded-md">
-                        #{kw}
-                      </span>
-                    ))}
+                {session.cardCount > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <span className="text-xs text-orange-600 font-medium">
+                      {session.cardCount} flashcard{session.cardCount !== 1 ? 's' : ''} • +{session.cardCount * 15} XP
+                    </span>
                   </div>
                 )}
-              </div>
+              </motion.button>
             ))}
-            <div ref={cardsEndRef} />
           </div>
-        </div>
-
-        {/* Q&A Input */}
-        <div className="p-6 bg-white border-t border-gray-200">
-          <form onSubmit={handleAsk} className="max-w-3xl mx-auto relative">
-            <input
-              type="text"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ask a question about the lecture..."
-              disabled={!isRecording || isAsking}
-              className="w-full pl-4 pr-12 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={!isRecording || !question.trim() || isAsking}
-              className="absolute right-2 top-2 bottom-2 aspect-square flex items-center justify-center bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 transition-colors"
-            >
-              <MessageSquare className="w-5 h-5" />
-            </button>
-          </form>
-        </div>
-      </div>
+        )}
+      </main>
     </div>
   );
 }
