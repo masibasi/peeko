@@ -18,7 +18,7 @@ export function SessionView() {
     focusScore, updateFocusScore,
   } = useStore();
 
-  const CARD_INTERVAL_S = 10;
+  const CARD_INTERVAL_S = 30;
 
   const [loading, setLoading] = useState(true);
   const [catchingUp, setCatchingUp] = useState(false);
@@ -101,6 +101,19 @@ export function SessionView() {
     }
   };
 
+  const resetCardTimer = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    setCountdown(CARD_INTERVAL_S);
+    intervalRef.current = setInterval(() => {
+      generateCard();
+      setCountdown(CARD_INTERVAL_S);
+    }, CARD_INTERVAL_S * 1000);
+    countdownRef.current = setInterval(() => {
+      setCountdown(prev => (prev <= 1 ? CARD_INTERVAL_S : prev - 1));
+    }, 1000);
+  };
+
   const startRecording = () => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       alert('Speech recognition not supported in this browser');
@@ -142,16 +155,7 @@ export function SessionView() {
     recognitionRef.current = recognition;
     recognition.start();
     setIsRecording(true);
-
-    setCountdown(CARD_INTERVAL_S);
-    intervalRef.current = setInterval(() => {
-      generateCard();
-      setCountdown(CARD_INTERVAL_S);
-    }, CARD_INTERVAL_S * 1000);
-
-    countdownRef.current = setInterval(() => {
-      setCountdown(prev => (prev <= 1 ? CARD_INTERVAL_S : prev - 1));
-    }, 1000);
+    resetCardTimer();
   };
 
   const stopRecording = () => {
@@ -182,6 +186,7 @@ export function SessionView() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
+      if (isRecording) resetCardTimer();
     } catch {}
     finally { setCatchingUp(false); }
   };
