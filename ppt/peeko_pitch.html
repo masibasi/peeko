@@ -786,6 +786,19 @@
   </section>
 
   <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 2.5 — DEMO VIDEO
+  ══════════════════════════════════════════════════════════════════ -->
+  <section class="slide" id="s-video" style="background:#000; flex-direction:column; gap:24px;">
+    <p class="eyebrow animate-in" style="color:rgba(255,255,255,0.6);">Demo</p>
+    <video
+      id="demo-video"
+      src="demo.mov"
+      controls
+      style="max-width:100%; max-height:80vh; border-radius:16px; box-shadow:0 8px 48px rgba(0,0,0,0.6);"
+    ></video>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════
        SLIDE 3 — WHY TOOLS FAIL
   ══════════════════════════════════════════════════════════════════ -->
   <section class="slide" id="s3">
@@ -1089,15 +1102,21 @@
     dotsEl.appendChild(d);
   });
 
+  const demoVideo = document.getElementById('demo-video');
+
   function go(n) {
     if (n === cur) return;
     slides[cur].classList.remove('active');
     slides[cur].classList.add('exit');
     setTimeout(() => slides[cur].classList.remove('exit'), 500);
+    // Pause video when leaving the video slide
+    if (!demoVideo.paused) { demoVideo.pause(); }
     cur = ((n % total) + total) % total;
     slides[cur].classList.add('active');
     document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('on', i === cur));
     document.getElementById('counter').textContent = `${cur + 1} / ${total}`;
+    // Auto-play video when entering the video slide
+    if (slides[cur].id === 's-video') { demoVideo.currentTime = 0; demoVideo.play(); }
   }
 
   document.getElementById('next').addEventListener('click', () => go(cur + 1));
