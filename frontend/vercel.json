@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/api/:path*", "destination": "$BACKEND_URL/:path*" },
+    { "source": "/api/:path*", "destination": "https://peeko-127d.onrender.com/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
