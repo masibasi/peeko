@@ -119,3 +119,31 @@ Next task: [task name]
 
 Ready for your instruction.
 ```
+---
+
+## Design Context
+> Captured via /teach-impeccable · 2026-04-04. Read this before touching any UI code.
+
+### Users
+College students using Peeko **during a live lecture** — multitasking, easily distracted, on a laptop. Job to be done: frictionless recovery (zone out → one tap → back on track in <30s). Emotional state: mild guilt → relief. UI must feel **easy and non-judgmental**.
+
+### Brand Personality
+**Playful · Warm · Encouraging** — like a cheerful friend in lecture, not a productivity coach. Peeko the fox is the emotional anchor.
+
+### Aesthetic Direction
+- **Reference**: Duolingo — character-centered, game-like progress, rounded bubbly elements, pastel fills, bold color blocks
+- **Theme**: Warm white background (~#FFFAF5), orange/amber primary, 16–24px border radii, soft layered shadows, pastel tints on cards
+- **Typography**: Rounded display font (Nunito / Plus Jakarta Sans) for headings + DM Sans for body
+
+### Anti-references (never look like these)
+- AI SaaS startup (blue gradients, robot icons, "Powered by AI" badges)
+- Generic admin dashboard (white cards + gray borders + chart grids)
+- Cheesy EdTech (Chegg/Quizlet-era crowded layouts)
+- Heavy dark mode (neon glow on black)
+
+### Design Principles
+1. **Character first** — Peeko is the hero on every screen, not decoration
+2. **Warmth over efficiency** — rounded, soft, playful; cards get tinted backgrounds
+3. **Celebrate recovery** — all feedback should feel "you got this", never punishing
+4. **Session View is the hero screen** — highest visual priority for the hackathon demo
+5. **No generic patterns** — if it looks like a shadcn/Tailwind UI default, push further

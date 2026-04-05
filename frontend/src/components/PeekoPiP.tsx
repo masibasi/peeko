@@ -4,9 +4,10 @@ import { useStore } from '../store/useStore';
 interface PeekoPiPProps {
   isSessionActive: boolean;
   transcript?: string;
+  isGenerating?: boolean;
 }
 
-export function PeekoPiP({ isSessionActive, transcript = '' }: PeekoPiPProps) {
+export function PeekoPiP({ isSessionActive, transcript = '', isGenerating = false }: PeekoPiPProps) {
   const { flashcards, peekoState, level } = useStore();
   const [isPiPOpen, setIsPiPOpen] = useState(false);
   const [isPiPSupported, setIsPiPSupported] = useState(false);
@@ -56,7 +57,7 @@ export function PeekoPiP({ isSessionActive, transcript = '' }: PeekoPiPProps) {
     if (pipWindowRef.current && !pipWindowRef.current.closed) {
       updatePiPContent();
     }
-  }, [flashcards, peekoState, level, transcript]);
+  }, [flashcards, peekoState, level, transcript, isGenerating]);
 
   // Close PiP when session ends
   useEffect(() => {
@@ -117,8 +118,13 @@ export function PeekoPiP({ isSessionActive, transcript = '' }: PeekoPiPProps) {
     }
     if (summaryEl) {
       const latestSummary = flashcards.length > 0 ? flashcards[0].front : '';
-      summaryEl.textContent = latestSummary || 'No summary yet';
-      summaryEl.className = `summary-text ${!latestSummary ? 'empty-state' : ''}`;
+      if (isGenerating || (!latestSummary && isSessionActive)) {
+        summaryEl.textContent = '';
+        summaryEl.className = 'summary-text generating';
+      } else {
+        summaryEl.textContent = latestSummary || 'No summary yet';
+        summaryEl.className = `summary-text ${!latestSummary ? 'empty-state' : ''}`;
+      }
     }
   };
 
@@ -259,6 +265,16 @@ export function PeekoPiP({ isSessionActive, transcript = '' }: PeekoPiPProps) {
           font-style: italic;
           opacity: 0.6;
         }
+        .generating::after {
+          content: 'Summarizing...';
+          animation: blink 1.2s ease-in-out infinite;
+          font-style: italic;
+          opacity: 0.7;
+        }
+        @keyframes blink {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 1; }
+        }
       `;
       pipWindow.document.head.appendChild(style);
 
@@ -284,8 +300,8 @@ export function PeekoPiP({ isSessionActive, transcript = '' }: PeekoPiPProps) {
           </div>
           <div class="summary-section">
             <div class="summary-label">✨ Latest Summary</div>
-            <div id="peeko-summary" class="summary-text ${!latestSummary ? 'empty-state' : ''}">
-              ${latestSummary || 'No summary yet'}
+            <div id="peeko-summary" class="${latestSummary ? 'summary-text' : 'summary-text generating'}">
+              ${latestSummary || ''}
             </div>
           </div>
         </div>

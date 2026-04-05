@@ -2,75 +2,101 @@ import { motion } from 'motion/react';
 import { useStore } from '../store/useStore';
 
 export function PeekoCharacter() {
-  const { peekoState, level } = useStore();
+  const { peekoState, level, isRecording } = useStore();
 
-  const getFoxEmoji = () => {
-    switch (level) {
-      case 1: return '🦊'; // Baby
-      case 2: return '🦊'; // Curious
-      case 3: return '🦊'; // Focused
-      case 4: return '🦊🎓'; // Scholar
-      case 5: return '🦊✨'; // Legendary
-      default: return '🦊';
-    }
+  const getFox = () => {
+    if (level >= 5) return '🦊✨';
+    if (level >= 4) return '🦊🎓';
+    return '🦊';
   };
 
-  const getAnimation = () => {
-    switch (peekoState) {
-      case 'calm':
-        return {
-          y: [0, -5, 0],
-          transition: { repeat: Infinity, duration: 3, ease: "easeInOut" }
-        };
-      case 'fidgety':
-        return {
-          x: [0, -5, 5, -5, 0],
-          rotate: [0, -5, 5, -5, 0],
-          transition: { repeat: Infinity, duration: 2 }
-        };
-      case 'puffed':
-        return {
-          scale: [1, 1.1, 1],
-          filter: ['drop-shadow(0 0 0px rgba(239,68,68,0))', 'drop-shadow(0 0 20px rgba(239,68,68,0.5))', 'drop-shadow(0 0 0px rgba(239,68,68,0))'],
-          transition: { repeat: Infinity, duration: 1.5 }
-        };
-      case 'happy':
-        return {
-          y: [0, -20, 0],
-          rotate: [0, 10, -10, 0],
-          transition: { duration: 0.5 }
-        };
-      case 'sleepy':
-        return {
-          y: [0, 5, 0],
-          opacity: [1, 0.8, 1],
-          transition: { repeat: Infinity, duration: 4 }
-        };
-      default:
-        return {};
-    }
-  };
+  const isAlert = peekoState === 'alert' || peekoState === 'puffed';
 
   return (
-    <div className="flex flex-col items-center justify-center p-8">
-      <motion.div
-        animate={getAnimation()}
-        className="text-8xl relative"
-      >
-        {getFoxEmoji()}
-        {peekoState === 'sleepy' && (
-          <motion.div 
-            animate={{ opacity: [0, 1, 0], y: [0, -20] }}
-            transition={{ repeat: Infinity, duration: 2 }}
-            className="absolute -top-4 -right-4 text-2xl"
-          >
-            zZ
-          </motion.div>
+    <div className="flex flex-col items-center justify-center pt-2 pb-4 select-none">
+      {/* Glow circle */}
+      <div className="relative w-40 h-40 flex items-center justify-center mb-3">
+        {/* Ambient radial glow */}
+        <div
+          className="absolute inset-0 rounded-full transition-all duration-700"
+          style={{
+            background: isAlert
+              ? 'radial-gradient(ellipse at 50% 60%, oklch(86% 0.10 68) 0%, oklch(93% 0.05 72) 55%, transparent 80%)'
+              : 'radial-gradient(ellipse at 50% 60%, oklch(93% 0.06 72) 0%, oklch(96% 0.03 74) 55%, transparent 80%)',
+          }}
+        />
+
+        {/* Solid inner circle */}
+        <div
+          className="absolute inset-5 rounded-full transition-colors duration-700"
+          style={{
+            backgroundColor: isAlert
+              ? 'oklch(92% 0.065 68)'
+              : 'oklch(95% 0.040 72)',
+          }}
+        />
+
+        {/* Recording pulse rings */}
+        {isRecording && (
+          <>
+            <div
+              className="absolute inset-3 rounded-full animate-recording-ring"
+              style={{ border: '2px solid var(--brand)', opacity: 0.5 }}
+            />
+            <div
+              className="absolute inset-1 rounded-full animate-recording-ring"
+              style={{
+                border: '2px solid var(--brand)',
+                opacity: 0.25,
+                animationDelay: '0.6s',
+              }}
+            />
+          </>
         )}
-      </motion.div>
-      <div className="mt-4 text-center">
-        <h2 className="text-xl font-bold text-gray-800">Peeko (Lvl {level})</h2>
-        <p className="text-sm text-gray-500 capitalize">{peekoState}</p>
+
+        {/* Peeko emoji */}
+        <motion.div
+          className="relative z-10 text-7xl leading-none"
+          animate={
+            isAlert
+              ? { y: [0, -8, 0], rotate: [0, -3, 3, 0] }
+              : peekoState === 'sleepy'
+              ? { y: [0, 4, 0], opacity: [1, 0.8, 1] }
+              : { y: [0, -6, 0] }
+          }
+          transition={{
+            repeat: Infinity,
+            duration: isAlert ? 1.8 : peekoState === 'sleepy' ? 4 : 3.5,
+            ease: 'easeInOut',
+          }}
+        >
+          {getFox()}
+          {peekoState === 'sleepy' && (
+            <motion.span
+              className="absolute -top-3 -right-3 text-xl"
+              animate={{ opacity: [0, 1, 0], y: [0, -12] }}
+              transition={{ repeat: Infinity, duration: 2.2 }}
+            >
+              z
+            </motion.span>
+          )}
+        </motion.div>
+      </div>
+
+      {/* Status label */}
+      <div className="text-center">
+        <p className="text-xs font-black uppercase tracking-widest text-ink-400">
+          {isRecording
+            ? 'Listening'
+            : peekoState === 'alert'
+            ? 'On alert'
+            : peekoState === 'sleepy'
+            ? 'Resting'
+            : 'Ready'}
+        </p>
+        {level > 1 && (
+          <p className="text-xs font-semibold text-ink-300 mt-0.5">Level {level}</p>
+        )}
       </div>
     </div>
   );
