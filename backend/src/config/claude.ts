@@ -1,4 +1,4 @@
-import Groq from 'groq-sdk';
+import Anthropic from '@anthropic-ai/sdk';
 import { env } from './env.js';
 
-export const groq = new Groq({ apiKey: env.GROQ_API_KEY });
+export const anthropic = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
