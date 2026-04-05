@@ -253,7 +253,7 @@ export function SessionView() {
         </div>
         
         <div className="flex items-center gap-3">
-          <PeekoPiP isSessionActive={isRecording} />
+          <PeekoPiP isSessionActive={isRecording} transcript={transcript} />
           <button
             onClick={handleEndSession}
             className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
