@@ -1,7 +1,11 @@
 import { motion } from 'motion/react';
 import { useStore } from '../store/useStore';
 
-export function PeekoCharacter() {
+interface PeekoCharacterProps {
+  size?: 'default' | 'compact';
+}
+
+export function PeekoCharacter({ size = 'default' }: PeekoCharacterProps) {
   const { peekoState, level, isRecording } = useStore();
 
   const getFox = () => {
@@ -11,6 +15,36 @@ export function PeekoCharacter() {
   };
 
   const isAlert = peekoState === 'alert' || peekoState === 'puffed';
+
+  if (size === 'compact') {
+    return (
+      <div className="flex items-center gap-3 select-none">
+        <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: isAlert
+                ? 'radial-gradient(circle, oklch(88% 0.10 68), transparent 80%)'
+                : 'radial-gradient(circle, oklch(93% 0.06 72), transparent 80%)',
+            }}
+          />
+          <motion.span
+            className="text-2xl relative z-10 leading-none"
+            animate={{ y: [0, -3, 0] }}
+            transition={{ repeat: Infinity, duration: 3.5, ease: 'easeInOut' }}
+          >
+            🦊
+          </motion.span>
+        </div>
+        <div>
+          <p className="text-xs font-black text-ink-900 leading-tight">Peeko</p>
+          <p className="text-[11px] font-semibold text-ink-400">
+            {isRecording ? 'Listening' : isAlert ? 'Alert' : 'Ready'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center pt-2 pb-4 select-none">
