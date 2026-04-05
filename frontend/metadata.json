@@ -1,0 +1,7 @@
+{
+  "name": "ClassMate AI",
+  "description": "A browser-based study assistant that captures, transcribes, and summarizes lectures in real time with a floating PiP study window.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
