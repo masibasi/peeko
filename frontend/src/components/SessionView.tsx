@@ -18,7 +18,7 @@ export function SessionView() {
     focusScore, updateFocusScore,
   } = useStore();
 
-  const CARD_INTERVAL_S = 30;
+  const CARD_INTERVAL_S = 15;
 
   const [loading, setLoading] = useState(true);
   const [catchingUp, setCatchingUp] = useState(false);
@@ -36,6 +36,10 @@ export function SessionView() {
   const initCalledRef = useRef(false);
 
   const countdownPct = (countdown / CARD_INTERVAL_S) * 100;
+
+  // SVG arc countdown constants
+  const ARC_RADIUS = 58;
+  const ARC_CIRCUMFERENCE = 2 * Math.PI * ARC_RADIUS; // ~364.4
 
   useEffect(() => {
     if (initCalledRef.current) return;
@@ -311,106 +315,112 @@ export function SessionView() {
 
         {/* ── Left panel ── */}
         <div
-          className="w-72 xl:w-80 shrink-0 flex flex-col overflow-hidden transition-colors duration-700"
+          className="w-64 xl:w-72 shrink-0 flex flex-col overflow-hidden transition-colors duration-700"
           style={{
             backgroundColor: isRecording ? 'oklch(97.5% 0.022 72)' : 'var(--bg-base)',
             borderRight: '1px solid var(--ink-100)',
           }}
         >
-          {/* Peeko */}
-          <div className="shrink-0 px-4 pt-4">
-            <PeekoCharacter />
+          {/* Compact Peeko + XP */}
+          <div className="px-5 pt-4 pb-3 shrink-0 flex items-center justify-between">
+            <PeekoCharacter size="compact" />
+            <div className="text-right">
+              <span className="text-xs font-black tabular text-brand block">Lvl {level}</span>
+              <span className="text-[11px] font-bold tabular text-ink-400">{xp} XP</span>
+            </div>
           </div>
 
-          {/* Countdown strip */}
-          <AnimatePresence>
-            {isRecording && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="px-5 mb-3 shrink-0"
-              >
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="font-bold text-ink-400">Next card in</span>
-                  <span className="font-black tabular text-brand">{countdown}s</span>
-                </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--brand-subtle)' }}>
-                  <motion.div
-                    className="h-full rounded-full bg-brand"
-                    animate={{ width: `${countdownPct}%` }}
-                    transition={{ duration: 0.9, ease: 'linear' }}
-                  />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* ── Record zone: circular button + SVG arc ── */}
+          <div className="flex flex-col items-center px-4 py-4 shrink-0">
+            {/* Arc wrapper */}
+            <div className="relative" style={{ width: 148, height: 148 }}>
 
-          {/* Recording button */}
-          <div className="px-4 mb-3 shrink-0">
-            <div className="relative">
+              {/* SVG countdown arc — only visible when recording */}
+              <svg
+                viewBox="0 0 148 148"
+                className="absolute inset-0 w-full h-full"
+                style={{ transform: 'rotate(-90deg)' }}
+              >
+                {/* Track */}
+                <circle
+                  cx="74" cy="74" r={ARC_RADIUS}
+                  fill="none"
+                  stroke="var(--brand-subtle)"
+                  strokeWidth="3.5"
+                  opacity={isRecording ? 1 : 0}
+                  style={{ transition: 'opacity 0.4s' }}
+                />
+                {/* Depleting arc */}
+                <circle
+                  cx="74" cy="74" r={ARC_RADIUS}
+                  fill="none"
+                  stroke="var(--brand)"
+                  strokeWidth="3.5"
+                  strokeDasharray={ARC_CIRCUMFERENCE}
+                  strokeDashoffset={ARC_CIRCUMFERENCE * (1 - countdown / CARD_INTERVAL_S)}
+                  strokeLinecap="round"
+                  opacity={isRecording ? 1 : 0}
+                  style={{ transition: 'stroke-dashoffset 1s linear, opacity 0.4s' }}
+                />
+              </svg>
+
+              {/* Outer pulse rings when recording */}
               {isRecording && (
                 <>
                   <div
-                    className="absolute inset-0 rounded-2xl animate-recording-ring"
-                    style={{ border: '2px solid var(--brand)', pointerEvents: 'none' }}
+                    className="absolute inset-0 rounded-full animate-recording-ring"
+                    style={{ border: '1.5px solid var(--brand)', opacity: 0.3 }}
                   />
                   <div
-                    className="absolute inset-0 rounded-2xl animate-recording-ring"
-                    style={{ border: '2px solid var(--brand)', animationDelay: '0.9s', pointerEvents: 'none' }}
+                    className="absolute inset-0 rounded-full animate-recording-ring"
+                    style={{ border: '1.5px solid var(--brand)', opacity: 0.15, animationDelay: '0.9s' }}
                   />
                 </>
               )}
+
+              {/* Circular button */}
               <motion.button
-                whileTap={{ scale: 0.97, y: 2 }}
+                whileTap={{ scale: 0.92 }}
                 onClick={isRecording ? stopRecording : startRecording}
-                className="relative w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-base text-white transition-colors"
+                className="absolute flex flex-col items-center justify-center gap-1.5"
                 style={{
+                  top: 16, left: 16,
+                  width: 116, height: 116,
+                  borderRadius: '50%',
                   backgroundColor: isRecording ? 'oklch(56% 0.20 25)' : 'var(--brand)',
                   boxShadow: isRecording
-                    ? '0 4px 0 oklch(44% 0.20 25), 0 4px 16px oklch(56% 0.20 25 / 0.35)'
-                    : '0 4px 0 var(--brand-dark), var(--shadow-brand)',
+                    ? '0 5px 0 oklch(44% 0.20 25), 0 6px 24px oklch(56% 0.20 25 / 0.40)'
+                    : '0 5px 0 var(--brand-dark), var(--shadow-brand)',
+                  transition: 'background-color 0.2s',
                 }}
               >
-                {isRecording ? (
-                  <><MicOff className="w-5 h-5" /> Stop recording</>
-                ) : (
-                  <><Mic className="w-5 h-5" /> Start recording</>
-                )}
+                <motion.div
+                  animate={isRecording ? { scale: [1, 1.12, 1] } : { scale: 1 }}
+                  transition={{ repeat: isRecording ? Infinity : 0, duration: 1.4, ease: 'easeInOut' }}
+                >
+                  {isRecording
+                    ? <MicOff className="w-8 h-8 text-white" />
+                    : <Mic className="w-8 h-8 text-white" />
+                  }
+                </motion.div>
+                <span className="text-[10px] font-black text-white/90 uppercase tracking-widest">
+                  {isRecording ? 'Stop' : 'Record'}
+                </span>
               </motion.button>
             </div>
+
+            {/* Status line */}
+            <p className="text-xs font-black text-ink-400 mt-3 tabular text-center">
+              {isRecording
+                ? <>Listening · <span style={{ color: 'var(--brand)' }}>card in {countdown}s</span></>
+                : 'Press to begin'}
+            </p>
           </div>
 
-          {/* Focus score */}
+          {/* ── Catch Me Up ── */}
           <div className="px-4 mb-3 shrink-0">
-            <div
-              className="rounded-xl px-4 py-3 flex items-center justify-between"
-              style={{ backgroundColor: 'var(--ink-50)' }}
-            >
-              <span className="text-xs font-black text-ink-500">Focus score</span>
-              <div className="flex items-center gap-2">
-                <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--ink-100)' }}>
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{
-                      width: `${focusScore}%`,
-                      backgroundColor: focusScore > 75
-                        ? 'oklch(60% 0.15 145)'
-                        : focusScore > 45
-                        ? 'oklch(70% 0.16 82)'
-                        : 'oklch(60% 0.18 28)',
-                    }}
-                  />
-                </div>
-                <span className="text-xs font-black tabular text-ink-700">{focusScore}%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Catch Me Up */}
-          <div className="px-4 mb-4 shrink-0">
             <motion.button
-              whileTap={{ scale: 0.97, y: 2 }}
+              whileTap={{ scale: 0.96, y: 2 }}
               onClick={handleCatchMeUp}
               disabled={catchingUp || !isRecording}
               className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl font-black text-sm transition-all disabled:cursor-not-allowed"
@@ -435,25 +445,54 @@ export function SessionView() {
             </motion.button>
           </div>
 
-          {/* Live transcript */}
+          {/* ── Live transcript (minimal, no heavy container) ── */}
           <div
-            className="flex-1 mx-4 mb-4 rounded-xl overflow-hidden flex flex-col min-h-0"
+            className="flex-1 min-h-0 flex flex-col overflow-hidden mx-4 mb-4 rounded-xl"
             style={{ backgroundColor: 'var(--ink-50)' }}
           >
-            <div className="px-3.5 pt-3 pb-2 flex items-center gap-2 shrink-0">
-              <BookOpen className="w-3.5 h-3.5 text-ink-400" />
-              <span className="text-xs font-black uppercase tracking-widest text-ink-400">Transcript</span>
-              {isRecording && (
-                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-              )}
+            {/* Transcript header */}
+            <div
+              className="px-3.5 pt-3 pb-2 shrink-0 flex items-center gap-2"
+              style={{ borderBottom: '1px solid var(--ink-100)' }}
+            >
+              <BookOpen className="w-3 h-3 text-ink-400" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-ink-400">
+                Transcript
+              </span>
+              <div className="ml-auto flex items-center gap-1.5">
+                {/* Focus score as a glow dot */}
+                <div
+                  className="w-2 h-2 rounded-full transition-colors duration-700"
+                  title={`Focus: ${focusScore}%`}
+                  style={{
+                    backgroundColor: focusScore > 75
+                      ? 'oklch(58% 0.14 145)'
+                      : focusScore > 45
+                      ? 'oklch(66% 0.15 82)'
+                      : 'oklch(58% 0.17 28)',
+                    boxShadow: `0 0 5px ${focusScore > 75
+                      ? 'oklch(58% 0.14 145 / 0.6)'
+                      : focusScore > 45
+                      ? 'oklch(66% 0.15 82 / 0.6)'
+                      : 'oklch(58% 0.17 28 / 0.6)'}`,
+                  }}
+                />
+                {isRecording && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
+                )}
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-3.5 pb-3.5">
+
+            {/* Transcript text */}
+            <div className="flex-1 overflow-y-auto px-3.5 py-3">
               <p className="text-xs font-semibold text-ink-700 leading-relaxed whitespace-pre-wrap">
                 {transcript}
-                {interimText && <span style={{ color: 'var(--ink-300)' }}>{interimText}</span>}
+                {interimText && (
+                  <span style={{ color: 'var(--ink-300)' }}>{interimText}</span>
+                )}
                 {!transcript && !interimText && (
                   <span style={{ color: 'var(--ink-300)' }} className="italic">
-                    {isRecording ? 'Listening…' : 'Press start to begin'}
+                    {isRecording ? 'Listening…' : 'Press record to begin'}
                   </span>
                 )}
               </p>
@@ -462,7 +501,7 @@ export function SessionView() {
         </div>
 
         {/* ── Timeline ── */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
           <Timeline />
         </div>
       </div>

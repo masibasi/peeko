@@ -133,7 +133,7 @@ export function Timeline() {
   );
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-surface)' }}>
+    <div className="flex-1 flex flex-col overflow-hidden min-h-0" style={{ backgroundColor: 'var(--bg-surface)' }}>
 
       {/* Header */}
       <div className="px-6 pt-5 pb-4 border-b border-ink-100 flex items-center justify-between shrink-0">
@@ -149,7 +149,7 @@ export function Timeline() {
       <div className="flex-1 flex overflow-hidden min-h-0">
 
         {/* Left: Summary cards */}
-        <div className="flex-1 flex flex-col overflow-hidden border-r border-ink-100">
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0 border-r border-ink-100">
           <div className="px-4 pt-3 pb-2 shrink-0 border-b border-ink-50">
             <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: 'var(--brand)' }}>
               ⭐ Summary
@@ -158,7 +158,7 @@ export function Timeline() {
               <span className="text-[11px] font-bold text-ink-300 ml-2">{summaryCards.length}</span>
             )}
           </div>
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+          <div className="flex-1 overflow-y-auto min-h-0 px-4 py-4 space-y-3">
             <AnimatePresence initial={false}>
               {summaryCards.map((card, i) => renderSummaryCard(card, i))}
             </AnimatePresence>
@@ -186,7 +186,7 @@ export function Timeline() {
         </div>
 
         {/* Right: Catch Me Up cards */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
           <div className="px-4 pt-3 pb-2 shrink-0 border-b border-ink-50">
             <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: 'var(--catchup)' }}>
               ⚡ Catch Me Up
@@ -195,7 +195,7 @@ export function Timeline() {
               <span className="text-[11px] font-bold text-ink-300 ml-2">{catchupCards.length}</span>
             )}
           </div>
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+          <div className="flex-1 overflow-y-auto min-h-0 px-4 py-4 space-y-3">
             <AnimatePresence initial={false}>
               {catchupCards.map((card, i) => renderCatchupCard(card, i))}
             </AnimatePresence>
