@@ -42,12 +42,12 @@ function AppContent() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Redirect to dashboard when authenticated
+  // Redirect to dashboard when authenticated and on landing/login pages
   useEffect(() => {
-    if (isAuthenticated && currentPage !== 'dashboard') {
+    if (isAuthenticated && (currentPage === 'landing' || currentPage === 'login')) {
       navigate('dashboard');
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, currentPage]);
 
   const navigate = (page: Page) => {
     const path = page === 'landing' ? '/' : `/${page}`;

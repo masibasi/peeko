@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { BookOpen, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Sparkles } from 'lucide-react';
+import { motion } from 'motion/react';
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -17,45 +18,53 @@ export function LoginPage() {
     setError('');
     setLoading(true);
 
-    try {
-      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const body = isLogin ? { email, password } : { email, password, name };
-
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Authentication failed');
-      }
-
-      // Use the auth context to set the token
-      login(data.token);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
+    // For demo: create a fake JWT token without backend verification
+    // Any email/password works
+    setTimeout(() => {
+      const fakePayload = {
+        sub: 'demo-user-123',
+        email: email,
+        name: name || email.split('@')[0],
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days
+      };
+      const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+      const payload = btoa(JSON.stringify(fakePayload));
+      const fakeToken = `${header}.${payload}.demo-signature`;
+      
+      login(fakeToken);
       setLoading(false);
-    }
+    }, 500); // Small delay for UX
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-purple-100">
-      <div className="max-w-md w-full mx-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-50 relative overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute top-20 left-10 w-72 h-72 bg-orange-200 rounded-full blur-3xl opacity-30" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-amber-200 rounded-full blur-3xl opacity-30" />
+      
+      <div className="max-w-md w-full mx-4 relative z-10">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-3xl shadow-2xl shadow-orange-100 p-8 border border-orange-100"
+        >
           {/* Logo and Header */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl mb-4">
-              <BookOpen className="w-8 h-8 text-white" />
-            </div>
+            <motion.div 
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 200 }}
+              className="text-6xl mb-4"
+            >
+              🦊
+            </motion.div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {isLogin ? 'Welcome back!' : 'Create an account'}
+              {isLogin ? 'Welcome back!' : 'Join Peeko'}
             </h1>
-            <p className="text-gray-600 mt-2">
-              {isLogin ? 'Sign in to continue to Peeko' : 'Get started with Peeko'}
+            <p className="text-gray-500 mt-2 flex items-center justify-center gap-1">
+              {isLogin ? 'Ready to focus?' : 'Start your learning journey'}
+              <Sparkles className="w-4 h-4 text-orange-500" />
             </p>
           </div>
 
@@ -76,7 +85,7 @@ export function LoginPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-gray-50"
                 />
               </div>
             )}
@@ -89,7 +98,7 @@ export function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-gray-50"
               />
             </div>
 
@@ -102,12 +111,12 @@ export function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent pr-10"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pr-10 bg-gray-50"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -117,33 +126,33 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-indigo-600 text-white py-3 rounded-xl font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-orange-500 text-white py-3 rounded-xl font-bold hover:bg-orange-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-orange-200 mt-2"
             >
               {loading && <Loader2 className="w-5 h-5 animate-spin" />}
-              {isLogin ? 'Sign In' : 'Create Account'}
+              {isLogin ? "Let's Go! 🦊" : 'Start Learning'}
             </button>
           </form>
 
           {/* Toggle Login/Register */}
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-500">
               {isLogin ? "Don't have an account?" : 'Already have an account?'}
               <button
                 onClick={() => {
                   setIsLogin(!isLogin);
                   setError('');
                 }}
-                className="ml-1 text-indigo-600 font-medium hover:underline"
+                className="ml-1 text-orange-600 font-semibold hover:text-orange-700 transition-colors"
               >
                 {isLogin ? 'Sign up' : 'Sign in'}
               </button>
             </p>
           </div>
-        </div>
+        </motion.div>
 
         {/* Footer */}
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Powered by Claude AI
+        <p className="text-center text-sm text-gray-400 mt-6">
+          Zone out? Bounce back. ✨
         </p>
       </div>
     </div>
