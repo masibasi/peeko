@@ -1,9 +1,23 @@
-import { anthropic } from '../config/claude.js';
+import { groq } from '../config/claude.js';
 import { Card, SummaryContent, CatchMeUpContent } from '../types/index.js';
+
+const MODEL = 'llama-3.3-70b-versatile';
 
 function parseJSON(text: string): unknown {
   const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
   return JSON.parse(stripped);
+}
+
+async function chat(system: string, userMessage: string): Promise<string> {
+  const response = await groq.chat.completions.create({
+    model: MODEL,
+    max_tokens: 1024,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: userMessage },
+    ],
+  });
+  return response.choices[0].message.content ?? '';
 }
 
 export async function generateSummaryCard(
@@ -30,26 +44,16 @@ If no Q&A detected, return qa as an empty array [].`;
     '{"type":"summary","title":"string","bullets":["string"],"keywords":["string"],"qa":[{"question":"string","answer":"string"}],"timestamp":"ISO string"}\n' +
     'Use "bullets" (not bullet_points) and "keywords" (not key_concepts).';
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 1024,
-    system,
-    messages: [{ role: 'user', content: userMessage }],
-  });
-
-  const text = response.content[0].type === 'text' ? response.content[0].text : '';
+  const text = await chat(system, userMessage);
 
   try {
     return parseJSON(text) as SummaryContent;
   } catch {
-    const retry = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      system: 'You MUST return raw JSON only. No markdown, no code fences, no explanation.',
-      messages: [{ role: 'user', content: userMessage }],
-    });
-    const retryText = retry.content[0].type === 'text' ? retry.content[0].text : '';
-    return parseJSON(retryText) as SummaryContent;
+    const retry = await chat(
+      'You MUST return raw JSON only. No markdown, no code fences, no explanation.',
+      userMessage,
+    );
+    return parseJSON(retry) as SummaryContent;
   }
 }
 
@@ -79,25 +83,15 @@ The student just snapped back to attention. Generate a recovery response:
   const system =
     'You are a lecture recovery assistant. Return ONLY valid JSON. No preamble, no markdown.';
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 1024,
-    system,
-    messages: [{ role: 'user', content: userMessage }],
-  });
-
-  const text = response.content[0].type === 'text' ? response.content[0].text : '';
+  const text = await chat(system, userMessage);
 
   try {
     return parseJSON(text) as CatchMeUpContent;
   } catch {
-    const retry = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      system: 'You MUST return raw JSON only. No markdown, no code fences, no explanation.',
-      messages: [{ role: 'user', content: userMessage }],
-    });
-    const retryText = retry.content[0].type === 'text' ? retry.content[0].text : '';
-    return parseJSON(retryText) as CatchMeUpContent;
+    const retry = await chat(
+      'You MUST return raw JSON only. No markdown, no code fences, no explanation.',
+      userMessage,
+    );
+    return parseJSON(retry) as CatchMeUpContent;
   }
 }
