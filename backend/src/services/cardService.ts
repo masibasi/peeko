@@ -62,8 +62,9 @@ export async function generateCard(
   // Word count guard (skip for final card)
   if (!skipWordCountGuard) {
     const wordCount = await transcriptService.countWordsSince(sessionId, checkpoint);
-    if (wordCount < 100) {
-      return { status: 'skipped', reason: `Only ${wordCount} words since last card` };
+    const minWords = parseInt(process.env['MIN_WORDS_FOR_CARD'] ?? '10', 10);
+    if (wordCount < minWords) {
+      return { status: 'skipped', reason: `Only ${wordCount} words since last card (min: ${minWords})` };
     }
   }
 

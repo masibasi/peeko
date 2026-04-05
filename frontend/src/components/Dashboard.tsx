@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../store/useStore';
 import { motion } from 'motion/react';
-import { Plus, Clock, FileText, LogOut, Calendar, ChevronRight, Search, Flame, Zap, Target, Trophy } from 'lucide-react';
+import { Plus, Clock, FileText, LogOut, Calendar, ChevronRight, Search, Flame, Zap, Target, Trophy, Trash2 } from 'lucide-react';
 
 interface Session {
   id: string;
@@ -25,7 +25,7 @@ export function Dashboard() {
 
   const fetchSessions = async () => {
     try {
-      const res = await fetch('/api/sessions');
+      const res = await fetch('/api/session');
       if (res.ok) {
         const data = await res.json();
         setSessions(data.sessions || []);
@@ -42,7 +42,18 @@ export function Dashboard() {
   };
 
   const handleSessionClick = (sessionId: string) => {
-    window.location.href = `/session/${sessionId}`;
+    window.location.href = `/session/${sessionId}/notebook`;
+  };
+
+  const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation();
+    if (!confirm('Delete this session? This cannot be undone.')) return;
+    try {
+      await fetch(`/api/session/${sessionId}`, { method: 'DELETE' });
+      setSessions(prev => prev.filter(s => s.id !== sessionId));
+    } catch (err) {
+      console.error('Failed to delete session:', err);
+    }
   };
 
   const handleLogout = () => {
@@ -284,7 +295,15 @@ export function Dashboard() {
                   <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-2xl">
                     🦊
                   </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-500 transition-colors" />
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => handleDeleteSession(e, session.id)}
+                      className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-500 transition-colors" />
+                  </div>
                 </div>
                 
                 <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">

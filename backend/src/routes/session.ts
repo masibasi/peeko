@@ -15,12 +15,28 @@ async function requireSession(sessionId: string, res: Response) {
   return session;
 }
 
+// GET /session  (list user's sessions)
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sessions = await sessionService.getUserSessions(req.userId!);
+    res.json({ sessions });
+  } catch (err) { next(err); }
+});
+
 // POST /session/start
 router.post('/start', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
     const session = await sessionService.createSession(userId);
     res.json({ session_id: session.session_id });
+  } catch (err) { next(err); }
+});
+
+// DELETE /session/:id
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await sessionService.deleteSession(req.params['id'] as string, req.userId!);
+    res.json({ success: true });
   } catch (err) { next(err); }
 });
 

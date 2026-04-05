@@ -27,8 +27,8 @@ export function Timeline() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               className={`p-4 rounded-xl shadow-sm border ${
-                card.type === 'qa' ? 'bg-yellow-50 border-yellow-200' : 
-                card.type === 'catchup' ? 'bg-blue-50 border-blue-200' :
+                card.type === 'qa' ? 'bg-yellow-50 border-yellow-200' :
+                card.type === 'catchup' || card.type === 'catchmeup' ? 'bg-blue-50 border-blue-200' :
                 'bg-white border-gray-200'
               }`}
             >

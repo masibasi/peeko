@@ -18,17 +18,30 @@ export function SessionView() {
     focusScore, updateFocusScore
   } = useStore();
   
+  const CARD_INTERVAL_S = 10;
+
   const [loading, setLoading] = useState(true);
   const [catchingUp, setCatchingUp] = useState(false);
+  const [endingSession, setEndingSession] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [interimText, setInterimText] = useState('');
+  const [countdown, setCountdown] = useState(CARD_INTERVAL_S);
   const recognitionRef = useRef<any>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const seenCardIds = useRef<Set<string>>(new Set());
+  const sessionIdRef = useRef<string | null>(null);
+  const initCalledRef = useRef(false);
 
   useEffect(() => {
+    if (initCalledRef.current) return;
+    initCalledRef.current = true;
     initSession();
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
       if (recognitionRef.current) recognitionRef.current.stop();
     };
   }, []);
@@ -50,6 +63,7 @@ export function SessionView() {
       });
       const data = await res.json();
       setSessionId(data.session_id);
+      sessionIdRef.current = data.session_id;
       startSession();
       
       // Set initial quests
@@ -59,6 +73,30 @@ export function SessionView() {
         { id: '3', title: 'Get 5 flashcards', description: '', xp: 25, type: 'flashcard_count', target: 5, progress: 0, completed: false },
       ]);
       
+      // Poll for new cards every 3 seconds
+      pollRef.current = setInterval(async () => {
+        try {
+          const cardsRes = await fetch(`/api/session/${data.session_id}/cards`);
+          const cardsData = await cardsRes.json();
+          (cardsData.cards || []).forEach((card: any) => {
+            if (seenCardIds.current.has(card.card_id)) return;
+            seenCardIds.current.add(card.card_id);
+            addFlashcard({
+              topic: card.content?.title || 'Summary',
+              front: card.type === 'catchmeup' ? (card.content?.now || 'Catch Me Up') : (card.content?.title || 'Summary'),
+              back: card.type === 'catchmeup'
+                ? [card.content?.missed, card.content?.rejoin_tip].filter(Boolean)
+                : card.content?.bullets || [],
+              keywords: card.content?.keywords || [],
+              importance: card.type === 'catchmeup' ? 'high' : 'medium',
+              type: card.type === 'catchmeup' ? 'catchup' : 'flashcard',
+            });
+          });
+        } catch (err) {
+          console.error('Polling error:', err);
+        }
+      }, 3000);
+
       setLoading(false);
     } catch (err) {
       console.error('Failed to start session:', err);
@@ -94,8 +132,9 @@ export function SessionView() {
       if (final) {
         setTranscript(prev => prev + final);
         // Send to backend
-        if (sessionId) {
-          fetch(`/api/session/${sessionId}/transcript`, {
+        const sid = sessionIdRef.current;
+        if (sid) {
+          fetch(`/api/session/${sid}/transcript`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: final.trim(), is_final: true })
@@ -122,67 +161,53 @@ export function SessionView() {
     recognition.start();
     setIsRecording(true);
 
-    // Generate cards every 5 minutes
+    // Generate cards every 10 seconds (testing)
+    setCountdown(CARD_INTERVAL_S);
     intervalRef.current = setInterval(() => {
       generateCard();
-    }, 5 * 60 * 1000);
+      setCountdown(CARD_INTERVAL_S);
+    }, CARD_INTERVAL_S * 1000);
+
+    // Countdown ticker
+    countdownRef.current = setInterval(() => {
+      setCountdown(prev => (prev <= 1 ? CARD_INTERVAL_S : prev - 1));
+    }, 1000);
   };
 
   const stopRecording = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    setCountdown(CARD_INTERVAL_S);
     setIsRecording(false);
   };
 
   const generateCard = async () => {
-    if (!sessionId) return;
+    const sid = sessionIdRef.current;
+    if (!sid) return;
     try {
-      const res = await fetch(`/api/session/${sessionId}/generate-card`, {
+      await fetch(`/api/session/${sid}/generate-card`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
-      const data = await res.json();
-      if (data.card) {
-        addFlashcard({
-          topic: data.card.content?.title || 'Summary',
-          front: data.card.content?.title || 'Lecture Summary',
-          back: data.card.content?.bullets || [],
-          keywords: data.card.content?.keywords || [],
-          importance: 'medium',
-          type: 'flashcard'
-        });
-      }
+      // Card will appear via polling — no direct addFlashcard here
     } catch (err) {
       console.error('Failed to generate card:', err);
     }
   };
 
   const handleCatchMeUp = async () => {
-    if (!sessionId) return;
+    const sid = sessionIdRef.current;
+    if (!sid) return;
     setCatchingUp(true);
     try {
-      const res = await fetch(`/api/session/${sessionId}/catch-me-up`, {
+      await fetch(`/api/session/${sid}/catch-me-up`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
-      const data = await res.json();
-      if (data.card) {
-        addFlashcard({
-          topic: 'Catch Me Up',
-          front: data.card.content?.now || 'Recovery Summary',
-          back: [
-            data.card.content?.missed || '',
-            data.card.content?.rejoin_tip || ''
-          ].filter(Boolean),
-          keywords: [],
-          importance: 'high',
-          type: 'catchup'
-        });
-      }
+      // Card will appear via polling — no direct addFlashcard here
     } catch (err) {
       console.error('Failed to catch me up:', err);
     } finally {
@@ -191,15 +216,21 @@ export function SessionView() {
   };
 
   const handleEndSession = async () => {
+    setEndingSession(true);
     stopRecording();
-    if (sessionId) {
-      await fetch(`/api/session/${sessionId}/end`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
+    const sid = sessionIdRef.current;
+    if (sid) {
+      try {
+        await fetch(`/api/session/${sid}/end`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (err) {
+        console.error('Failed to end session:', err);
+      }
     }
     endSession();
-    window.location.href = '/dashboard';
+    window.location.href = sid ? `/session/${sid}/notebook` : '/dashboard';
   };
 
   const handleBack = () => {
@@ -219,6 +250,25 @@ export function SessionView() {
           <div className="text-6xl mb-4">🦊</div>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
           <p className="mt-4 text-gray-600">Starting session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (endingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <motion.div
+            animate={{ scale: [1, 1.1, 1] }}
+            transition={{ duration: 1.2, repeat: Infinity }}
+            className="text-6xl mb-6"
+          >
+            🦊
+          </motion.div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-700 font-medium">Wrapping up your session...</p>
+          <p className="text-gray-400 text-sm mt-1">Generating your final summary card</p>
         </div>
       </div>
     );
@@ -305,6 +355,23 @@ export function SessionView() {
               </>
             )}
           </motion.button>
+
+          {/* Next Card Countdown */}
+          {isRecording && (
+            <div className="mb-4 bg-orange-50 rounded-xl p-3 border border-orange-100">
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="text-gray-600 font-medium">Next summary card</span>
+                <span className="font-bold text-orange-600">{countdown}s</span>
+              </div>
+              <div className="w-full h-1.5 bg-orange-100 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-orange-400 rounded-full"
+                  animate={{ width: `${(countdown / CARD_INTERVAL_S) * 100}%` }}
+                  transition={{ duration: 0.9, ease: 'linear' }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Catch Me Up Button */}
           <motion.button

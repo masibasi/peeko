@@ -1,5 +1,5 @@
 # Peeko — Progress Tracker
-> Last updated: 2026-04-04
+> Last updated: 2026-04-04 (after frontend v2)
 
 ---
 
@@ -7,147 +7,167 @@
 
 | Layer | Status | Notes |
 |---|---|---|
-| Backend (real) | **Complete** | All endpoints, Deepgram, Claude, Supabase |
-| Frontend UI | **Partial** | Single Dashboard component, no routing/auth |
-| Frontend ↔ Backend wiring | **NOT DONE** | Frontend runs against Gemini mock server |
+| Backend | **Complete** | All endpoints, Deepgram, Claude, Supabase |
+| Frontend UI | **Mostly done** | Routing, auth UI, Peeko PiP, session view all added in v2 |
+| Frontend ↔ Backend wiring | **NOT DONE** | Path mismatch + missing auth headers |
 | DB schema / migration | **Complete** | `backend/supabase-migration.sql` ready to run |
-| Auth | **Backend only** | Frontend sends no token; bypass mode exists |
-| Peeko PiP | **Basic** | Opens window, shows card + transcript; no fox, no bubbles |
+| Auth | **UI exists, wiring incomplete** | AuthContext + LoginPage built; token not sent on all requests |
+| Peeko PiP | **Component built** | `PeekoPiP.tsx` exists; keyword bubbles need verification |
 | Deploy | **Not started** | Vercel (frontend) + Railway/Render (backend) |
 
 ---
 
-## What Is Actually Built
+## What Changed in Frontend v2
 
-### Backend (`/backend/`) — MATCHES SPEC
+### New components
+| File | What it does |
+|------|-------------|
+| `LandingPage.tsx` | Landing page at `/` |
+| `LoginPage.tsx` | Login UI at `/login` |
+| `PeekoCharacter.tsx` | Peeko fox character (calm / alert states) |
+| `PeekoPiP.tsx` | Document PiP floating window with Peeko + keywords |
+| `SessionView.tsx` | Active session (replaces monolithic Dashboard) |
+| `Timeline.tsx` | Scrollable card timeline sidebar |
+| `PostSessionReport.tsx` | Post-session notebook / report |
+| `AuthContext.tsx` | Google JWT storage + `useAuth()` hook |
+| `lib/auth.ts` | JWT decode, expiry check, localStorage helpers |
 
-**Server & routing**
-- `src/index.ts` — HTTP + WebSocket server, upgrades `/session/:id/audio` WS connections
-- `src/app.ts` — Express app with CORS, auth middleware, `/session` router
+### Routing now exists (`App.tsx`)
+```
+/            → LandingPage
+/login       → LoginPage
+/dashboard   → (dashboard — to be confirmed)
+/session     → SessionView
+```
 
-**All endpoints implemented (matches CLAUDE.md exactly):**
+### What v2 still uses from v1
+- Web Speech API for transcription (not WebSocket audio)
+- `/api/session/*` paths (not `/session/*`)
+- `type: 'card' | 'qa' | 'catchmeup'` in the store (not `'summary'`)
+
+---
+
+## Backend — Complete (matches CLAUDE.md)
+
+All endpoints implemented:
 - `POST /session/start` — creates session in Supabase, returns `session_id`
-- `POST /session/:id/end` — triggers final card (no word count guard), marks session ended
-- `WS /session/:id/audio` — proxies raw audio → Deepgram, stores final chunks to Supabase
+- `POST /session/:id/end` — triggers final card, marks session ended
+- `WS /session/:id/audio` — proxies raw audio → Deepgram, stores final chunks
 - `POST /session/:id/generate-card` — checkpoint-based windowing, 100-word guard, Claude call
 - `POST /session/:id/catch-me-up` — on-demand recovery summary via Claude
 - `GET /session/:id/cards` — polling endpoint
 - `GET /session/:id/notebook` — cards + all transcripts
-- `POST /session/:id/transcript` — dev convenience (bypass Deepgram, inject text directly)
+- `POST /session/:id/transcript` — dev convenience (inject text without Deepgram)
 
-**Services:**
-- `audioService.ts` — Deepgram nova-2 live streaming, interim→browser only, final→Supabase
-- `claudeService.ts` — `generateSummaryCard` + `generateCatchMeUp`, both with JSON retry logic; model: `claude-sonnet-4-20250514`
-- `cardService.ts` — checkpoint logic, word count guard, `generateFinalCard`, `getNotebook`
-- `transcriptService.ts` — chunk storage, windowed fetch, word count, last timestamp
-- `sessionService.ts` — create/get/end session, status updates
+Auth: `AUTH_REQUIRED=false` in `.env` → demo bypass (no token needed)
 
-**Auth:**
-- `AUTH_REQUIRED=false` → demo bypass (uses hardcoded UUID `00000000-0000-0000-0000-000000000001`)
-- `AUTH_REQUIRED=true` → validates Supabase JWT Bearer token
-
-**DB schema** (`supabase-migration.sql`):
-- `sessions`, `transcript_chunks`, `cards` — matches CLAUDE.md spec exactly
-- RLS policies in place (note: RLS uses `auth.uid()` so backend must use service role key to bypass)
-- Indexes on `session_id + timestamp` and `session_id + generated_at`
+> **Note:** Team is currently debating Claude vs Groq for the AI provider. Backend has both versions — remote is Groq, local has Claude version staged. Resolve before deploy.
 
 ---
 
-### Frontend (`/frontend/`) — PARTIAL / MOCK-WIRED
+## Remaining Gaps (ordered by priority)
 
-**What works (against Gemini mock server):**
-- Single `Dashboard` component — two-panel layout (transcript left, cards right)
-- Web Speech API transcription (interim gray / final black display)
-- 5-minute `setInterval` → `POST /api/session/:id/generate-card`
-- Catch Me Up button → `POST /api/session/:id/catch-me-up`
-- Q&A input → `POST /api/session/:id/ask` *(non-spec endpoint, see gaps)*
-- Notebook view (post-session card list with timeline connector)
-- Document PiP API: opens floating window showing latest card + live transcript text
-- Zustand store for session state
+### P0 — Frontend ↔ Backend Not Wired
 
-**`frontend/server.ts`** — THE ACTIVE DEV SERVER:
-- Runs as the API backend for `npm run dev`
-- Uses **Google Gemini** (not Claude) with in-memory storage (no Supabase)
-- Has `/ask` Q&A endpoint (not in real backend)
-- Card type `'card'` (not `'summary'`), and `'qa'` type — mismatches real backend
-- This file is a prototype stub; it's what the frontend currently talks to
+**Problem 1: Path mismatch**
+- Frontend calls `/api/session/*`
+- Backend listens at `/session/*`
+
+Fix — add to `frontend/vite.config.ts`:
+```ts
+server: {
+  proxy: {
+    '/api/session': {
+      target: 'http://localhost:3001',
+      rewrite: (path) => path.replace('/api/session', '/session'),
+      ws: true,
+    },
+  },
+},
+```
+
+**Problem 2: Auth header missing on most requests**
+- `SessionView.tsx` only sends `Authorization` header on `/session/start`
+- All other calls (`generate-card`, `catch-me-up`, `end`, `transcript`) send no token
+- Short-term fix: set `AUTH_REQUIRED=false` on backend
+- Proper fix: pass token in all `api.ts` calls
+
+**Problem 3: Remove or bypass `frontend/server.ts`**
+- `npm run dev` currently runs the Gemini mock server
+- Frontend needs to run against the real backend instead
 
 ---
 
-## Gaps vs CLAUDE.md Spec
+### P1 — Card Type Mismatch
 
-### P0 — Frontend ↔ Real Backend Not Connected
-The frontend (`npm run dev`) runs against `frontend/server.ts` (Gemini mock), not the real backend. To connect them:
-1. Frontend must point to `http://localhost:3001` (backend port)
-2. Frontend must send `Authorization: Bearer <token>` (or backend must run with `AUTH_REQUIRED=false`)
-3. Remove/retire `frontend/server.ts`
+| | Frontend store | Backend |
+|--|---------------|---------|
+| Summary card | `type: 'card'` | `type: 'summary'` |
+| Catch Me Up | `type: 'catchmeup'` ✅ | `type: 'catchmeup'` ✅ |
+| Q&A | `type: 'qa'` | embedded in `summary.qa[]` |
 
-### P0 — No Routing
-CLAUDE.md specifies:
-```
-/                   → Landing page
-/login              → Google OAuth
-/dashboard          → Past sessions grid
-/session/new        → Start session
-/session/:id        → Active session view
-/session/:id/notebook → Notebook
-```
-**Current state:** No react-router. App renders `<Dashboard />` unconditionally. No URL-based navigation.
+**Frontend `Timeline.tsx` and `PostSessionReport.tsx` filter on `type === 'card'`** — returns nothing when connected to real backend.
 
-### P0 — No Auth on Frontend
-- No login page, no Google OAuth flow
-- Frontend sends no auth token to backend
-- Backend must run in `AUTH_REQUIRED=false` for any frontend request to work
+Fix options:
+- A) Backend maps `'summary'` → `'card'` in the response (quick hack)
+- B) Frontend updates to use `'summary'` (correct, aligns with CLAUDE.md)
 
-### P1 — Peeko Character Missing
-- CLAUDE.md specifies a fennec fox (calm / alert states) in the PiP window
-- PiP currently shows "ClassMate AI" text header, no fox graphic/animation
-- No calm/alert state switching when Catch Me Up is triggered
-
-### P1 — No Keyword Bubble Animations
-- CLAUDE.md specifies bubbles fade in one by one on new card, old bubbles fade out
-- PiP currently renders the full card content (title + bullets) instead of keyword bubble UI
-
-### P1 — Catch Me Up Not Transient Overlay
-- CLAUDE.md: default = transient overlay; dismissed unless student taps "Save"
-- Current: added directly as a persistent card in the timeline
+---
 
 ### P1 — No Card Polling
+
 - CLAUDE.md: `GET /session/:id/cards` polled every 3s
-- Current: cards added locally on generate-card response; no polling loop
-
-### P1 — Frontend Uses Web Speech API, Not WebSocket Audio
-- CLAUDE.md: `getUserMedia` → WebSocket → backend → Deepgram
-- Current: browser's built-in `webkitSpeechRecognition` — no WebSocket audio stream
-- Deepgram backend is fully built but unreachable from current frontend
-
-### P2 — `/session/:id/ask` Not in Real Backend
-- Frontend calls `POST /api/session/:id/ask` for Q&A
-- Real backend has no `/ask` endpoint
-- Per CLAUDE.md, Q&A detection is embedded in summary cards, not a separate endpoint
-
-### P2 — Card Type Mismatch
-- Frontend store defines `type: 'card' | 'qa' | 'catchmeup'`
-- Real backend types are `'summary' | 'catchmeup'`
-- Frontend notebook view filters `cards.filter(c => c.type === 'card')` — returns nothing against real backend
-
-### P2 — `vite.config.ts` Exposes GEMINI_API_KEY
-- Leftover from Gemini prototype; irrelevant once connected to real backend
+- Current: cards added locally on generate-card response
+- Fix: add `setInterval(() => fetchCards(), 3000)` in `SessionView.tsx`
 
 ---
 
-## What Needs to Happen (Ordered)
+### P1 — `/ask` Endpoint Not in Backend
 
-1. **Wire frontend to real backend** — remove `server.ts` mock, set `VITE_API_BASE_URL=http://localhost:3001`, add auth token to requests
-2. **Switch audio to WebSocket** — `getUserMedia` → binary WebSocket to `ws://localhost:3001/session/:id/audio?token=...`
-3. **Add routing** — react-router with routes from spec
-4. **Auth UI** — Supabase Google OAuth login page, pass token in requests
-5. **Fix card types** — align frontend `'summary'` ↔ `'card'` mismatch
-6. **Card polling** — add `GET /session/:id/cards` interval (3s) in session view
-7. **Catch Me Up overlay** — transient display with Save/dismiss, not auto-appended
-8. **Peeko fox** — add character asset, calm/alert state, keyword bubbles with fade animation
-9. **Remove `/ask`** from frontend — replace with Q&A parsed from summary card `qa` array
-10. **Deploy** — Vercel (frontend SPA), Railway or Render (backend, WebSocket required)
+- `SessionView.tsx` may still call `POST /api/session/:id/ask`
+- Backend has no `/ask` route
+- Per CLAUDE.md, Q&A is embedded in summary card `content.qa[]` — read from there instead
+
+---
+
+### P2 — Web Speech API → WebSocket Audio (post-demo)
+
+- Current: browser `webkitSpeechRecognition` → HTTP POST transcript
+- CLAUDE.md spec: `getUserMedia` → binary WebSocket → backend → Deepgram
+- Deepgram backend is fully built and ready — frontend just needs to send audio over WS
+- Low priority for demo (HTTP transcript works fine with `AUTH_REQUIRED=false`)
+
+---
+
+### P2 — Catch Me Up Should Be Transient Overlay
+
+- CLAUDE.md: transient overlay, dismissed unless student taps "Save"
+- Current: appended as persistent card in timeline
+- Nice-to-have for demo polish
+
+---
+
+### P3 — Deploy
+
+- Frontend → Vercel (static SPA)
+- Backend → Railway or Render (WebSocket required, **not** Vercel serverless)
+- Set `AUTH_REQUIRED=true` in production env
+
+---
+
+## Connection Checklist (what to do right now)
+
+```
+[ ] Run supabase-migration.sql in Supabase SQL editor
+[ ] Create backend/.env from .env.example, fill in keys
+[ ] Set AUTH_REQUIRED=false in backend/.env
+[ ] npm install && npm run dev in /backend
+[ ] Add Vite proxy to frontend/vite.config.ts
+[ ] Change frontend dev script to NOT run server.ts (just vite)
+[ ] Test: start session → send transcript → generate card → catch me up
+[ ] Fix card type: 'summary' vs 'card' mismatch
+[ ] Add token to all api.ts calls (or keep AUTH_REQUIRED=false for demo)
+```
 
 ---
 
@@ -156,35 +176,44 @@ CLAUDE.md specifies:
 ```
 backend/
   src/
-    index.ts              WebSocket server + HTTP
-    app.ts                Express setup
+    index.ts              WebSocket server + HTTP entry point
+    app.ts                Express setup (CORS, auth, routes)
     config/
-      claude.ts           Anthropic SDK init
+      claude.ts           Anthropic SDK (or Groq — see team note above)
       deepgram.ts         Deepgram SDK init
       env.ts              Env var validation
-      supabase.ts         Supabase client
+      supabase.ts         Supabase service-role client
     middleware/
       auth.ts             JWT auth + demo bypass
       errorHandler.ts     Express error handler
     routes/
       session.ts          All REST routes
     services/
-      audioService.ts     Deepgram live streaming
+      audioService.ts     Deepgram live streaming proxy
       cardService.ts      Card generation + checkpoint logic
-      claudeService.ts    Claude API calls
+      claudeService.ts    Claude/Groq API calls
       sessionService.ts   Session CRUD
       transcriptService.ts Chunk storage + windowed fetch
     types/index.ts        DB types + Claude output schemas
   supabase-migration.sql  Run in Supabase SQL editor
 
 frontend/
-  server.ts               GEMINI MOCK SERVER (active dev backend — replace)
+  server.ts               MOCK SERVER (Gemini) — retire once backend wired
+  vite.config.ts          Add proxy here to connect to backend
   src/
-    App.tsx               Renders <Dashboard /> only
+    App.tsx               Routing (/, /login, /dashboard, /session)
+    contexts/
+      AuthContext.tsx     Google JWT auth state
     components/
-      Dashboard.tsx       Full session UI (transcript + cards + PiP + Q&A)
-    lib/api.ts            HTTP calls to backend
-    store/useStore.ts     Zustand state
-    index.css             Tailwind v4 import
-  vite.config.ts          Vite config (has stale GEMINI_API_KEY define)
+      LandingPage.tsx     / route
+      LoginPage.tsx       /login route
+      SessionView.tsx     Active session UI
+      Timeline.tsx        Card sidebar
+      PeekoCharacter.tsx  Fox character (calm/alert)
+      PeekoPiP.tsx        Document PiP window
+      PostSessionReport.tsx Post-session notebook
+    lib/
+      api.ts              HTTP calls — needs proxy + auth headers
+      auth.ts             JWT helpers
+    store/useStore.ts     Zustand state (card types need update)
 ```

@@ -45,6 +45,52 @@ export async function endSession(sessionId: string): Promise<Session> {
   return data as Session;
 }
 
+export async function getUserSessions(userId: string): Promise<any[]> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('session_id, started_at, ended_at, status')
+    .eq('user_id', userId)
+    .order('started_at', { ascending: false });
+
+  if (error) throw new Error(`Failed to fetch sessions: ${error.message}`);
+
+  const sessions = await Promise.all((data || []).map(async (session) => {
+    const { count } = await supabase
+      .from('cards')
+      .select('*', { count: 'exact', head: true })
+      .eq('session_id', session.session_id);
+
+    const startedAt = new Date(session.started_at);
+    const endedAt = session.ended_at ? new Date(session.ended_at) : new Date();
+    const durationMinutes = Math.round((endedAt.getTime() - startedAt.getTime()) / 60000);
+
+    return {
+      id: session.session_id,
+      title: `Session — ${startedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+      createdAt: session.started_at,
+      duration: durationMinutes,
+      cardCount: count || 0,
+      status: session.status,
+    };
+  }));
+
+  return sessions;
+}
+
+export async function deleteSession(sessionId: string, userId: string): Promise<void> {
+  // Delete cards and transcript chunks first (cascade not guaranteed)
+  await supabase.from('cards').delete().eq('session_id', sessionId);
+  await supabase.from('transcript_chunks').delete().eq('session_id', sessionId);
+
+  const { error } = await supabase
+    .from('sessions')
+    .delete()
+    .eq('session_id', sessionId)
+    .eq('user_id', userId); // ensures user owns the session
+
+  if (error) throw new Error(`Failed to delete session: ${error.message}`);
+}
+
 export async function updateStatus(
   sessionId: string,
   status: Session['status'],

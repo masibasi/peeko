@@ -32,6 +32,14 @@ export default defineConfig(({mode}) => {
       warmup: {
         clientFiles: ['./src/App.tsx', './src/main.tsx'],
       },
+      proxy: {
+        '/api/session': {
+          target: 'http://localhost:3001',
+          changeOrigin: true,
+          rewrite: (path) => path.replace('/api/session', '/session'),
+          ws: true,
+        },
+      },
     },
     build: {
       target: 'esnext',
