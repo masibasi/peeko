@@ -181,7 +181,7 @@ Every lecture is saved as a complete session.
 - Distraction nudges
 - Advanced Peeko states and distraction scoring
 - Tab visibility / blacklist detection
-- PDF lecture slides as pre-session context
+- ~~PDF lecture slides as pre-session context~~ *(moved in-scope — see PRD-addition.md)*
 - Gamification
 - Anki / flashcard export
 - Auto class grouping

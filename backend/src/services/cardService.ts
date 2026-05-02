@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabase.js';
 import * as transcriptService from './transcriptService.js';
 import * as claudeService from './claudeService.js';
+import * as retrieverService from './retrieverService.js';
 import { Card, SummaryContent, CatchMeUpContent } from '../types/index.js';
 
 // ---- Helpers ----
@@ -78,7 +79,8 @@ export async function generateCard(
   const intervalNumber = allCards.filter((c) => c.type === 'summary').length + 1;
 
   try {
-    const content = await claudeService.generateSummaryCard(allCards, transcriptWindow || '(silence)');
+    const ctx = await retrieverService.queryRelevantChunks(sessionId, transcriptWindow || '');
+    const content = await claudeService.generateSummaryCard(allCards, transcriptWindow || '(silence)', ctx);
     const card = await saveCard(
       sessionId,
       'summary',
@@ -111,7 +113,8 @@ export async function generateCatchMeUp(
     checkpoint,
   );
 
-  const content = await claudeService.generateCatchMeUp(allCards, transcriptSinceCheckpoint);
+  const ctx = await retrieverService.queryRelevantChunks(sessionId, transcriptSinceCheckpoint || '');
+  const content = await claudeService.generateCatchMeUp(allCards, transcriptSinceCheckpoint, ctx);
 
   // Catch Me Up is saved at the end of the timeline, does NOT advance summary checkpoint
   const lastChunkTs = await transcriptService.getLastChunkTimestamp(sessionId);

@@ -1,7 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 import * as sessionService from '../services/sessionService.js';
 import * as transcriptService from '../services/transcriptService.js';
 import * as cardService from '../services/cardService.js';
+import { processMaterial } from '../services/materialService.js';
+import { supabase } from '../config/supabase.js';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 const router = Router();
 
@@ -101,6 +106,67 @@ router.get('/:id/notebook', async (req: Request, res: Response, next: NextFuncti
   try {
     const notebook = await cardService.getNotebook(req.params['id'] as string);
     res.json(notebook);
+  } catch (err) { next(err); }
+});
+
+// POST /session/:id/materials — fire-and-poll: returns immediately with processing status
+router.post(
+  '/:id/materials',
+  upload.single('file'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const session = await requireSession(req.params['id'] as string, res);
+      if (!session) return;
+
+      const file = req.file;
+      if (!file) {
+        res.status(400).json({ error: 'file field is required' });
+        return;
+      }
+
+      // Insert stub row to get a material_id immediately
+      const { data: matRow, error: insertError } = await supabase
+        .from('lecture_materials')
+        .insert({
+          session_id: session.session_id,
+          filename: file.originalname,
+          file_url: '',
+          mime_type: file.mimetype,
+          status: 'processing',
+        })
+        .select('material_id')
+        .single();
+
+      if (insertError || !matRow) {
+        throw new Error(`Failed to create material row: ${insertError?.message}`);
+      }
+
+      const materialId = (matRow as { material_id: string }).material_id;
+
+      // Fire-and-poll: process asynchronously
+      processMaterial(file.buffer, file.mimetype, file.originalname, session.session_id, materialId).catch(
+        (err: Error) => console.error('[materials] Processing failed:', err.message),
+      );
+
+      res.json({ material_id: materialId, status: 'processing' });
+    } catch (err) { next(err); }
+  },
+);
+
+// GET /session/:id/materials — poll for status
+router.get('/:id/materials', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const session = await requireSession(req.params['id'] as string, res);
+    if (!session) return;
+
+    const { data, error } = await supabase
+      .from('lecture_materials')
+      .select('material_id, filename, status, chunk_count')
+      .eq('session_id', session.session_id)
+      .order('created_at', { ascending: true });
+
+    if (error) throw new Error(error.message);
+    res.json({ materials: data ?? [] });
   } catch (err) { next(err); }
 });
 

@@ -1,7 +1,7 @@
-import { groq } from '../config/claude.js';
+import { anthropic } from '../config/claude.js';
 import { Card, SummaryContent, CatchMeUpContent } from '../types/index.js';
 
-const MODEL = 'llama-3.3-70b-versatile';
+const MODEL = 'claude-sonnet-4-6';
 
 function parseJSON(text: string): unknown {
   const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
@@ -9,27 +9,30 @@ function parseJSON(text: string): unknown {
 }
 
 async function chat(system: string, userMessage: string): Promise<string> {
-  const response = await groq.chat.completions.create({
+  const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 1024,
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: userMessage },
-    ],
+    system,
+    messages: [{ role: 'user', content: userMessage }],
   });
-  return response.choices[0].message.content ?? '';
+  const block = response.content[0];
+  return block.type === 'text' ? block.text : '';
 }
 
 export async function generateSummaryCard(
   previousCards: Card[],
   transcriptWindow: string,
+  retrievedContext = '',
 ): Promise<SummaryContent> {
   const previousCardsSummary =
     previousCards.length > 0
       ? previousCards.map((c, i) => `Card ${i + 1} (${c.type}): ${JSON.stringify(c.content)}`).join('\n')
       : 'None yet.';
 
-  const userMessage = `Previous cards (session memory):
+  const userMessage = `Lecture materials (excerpts most relevant to this window):
+${retrievedContext || '(none provided)'}
+
+Previous cards (session memory):
 ${previousCardsSummary}
 
 New transcript (last 5 minutes):
@@ -42,7 +45,8 @@ If no Q&A detected, return qa as an empty array [].`;
   const system =
     'You are a lecture assistant. Return ONLY valid JSON matching this exact schema — no preamble, no markdown, no extra fields:\n' +
     '{"type":"summary","title":"string","bullets":["string"],"keywords":["string"],"qa":[{"question":"string","answer":"string"}],"timestamp":"ISO string"}\n' +
-    'Use "bullets" (not bullet_points) and "keywords" (not key_concepts).';
+    'Use "bullets" (not bullet_points) and "keywords" (not key_concepts).\n' +
+    'When lecture materials are provided, prioritize concepts grounded in them; treat tangents not supported by the materials as secondary.';
 
   const text = await chat(system, userMessage);
 
@@ -60,6 +64,7 @@ If no Q&A detected, return qa as an empty array [].`;
 export async function generateCatchMeUp(
   allCards: Card[],
   transcriptSinceCheckpoint: string,
+  retrievedContext = '',
 ): Promise<CatchMeUpContent> {
   const cardsSummary =
     allCards.length > 0
@@ -68,20 +73,20 @@ export async function generateCatchMeUp(
           .join('\n')
       : 'None yet.';
 
-  const userMessage = `Cards generated so far:
+  const userMessage = `Lecture materials (excerpts most relevant to this moment):
+${retrievedContext || '(none provided)'}
+
+Cards generated so far:
 ${cardsSummary}
 
 Transcript since last card checkpoint:
 ${transcriptSinceCheckpoint || '(no new transcript since last card)'}
 
-The student just snapped back to attention. Generate a recovery response:
-- now: what the professor is currently discussing
-- missed: key concepts the student likely missed
-- read_first: array of card interval_numbers most relevant to rejoin
-- rejoin_tip: the minimum context needed to follow along right now`;
+The student just snapped back to attention. Generate a recovery response: now / missed / read_first / rejoin_tip.`;
 
   const system =
-    'You are a lecture recovery assistant. Return ONLY valid JSON. No preamble, no markdown.';
+    'You are a lecture recovery assistant. Return ONLY valid JSON. No preamble, no markdown.\n' +
+    'When lecture materials are provided, prioritize concepts grounded in them; treat tangents not supported by the materials as secondary.';
 
   const text = await chat(system, userMessage);
 
