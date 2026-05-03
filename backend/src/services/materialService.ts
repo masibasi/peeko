@@ -6,6 +6,7 @@ const OVERLAP = 100;
 const MAX_CHUNK = 850;
 
 // Exported for unit tests
+
 export function chunkText(text: string): string[] {
   if (text.length <= MAX_CHUNK) return [text];
 
