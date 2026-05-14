@@ -5,8 +5,8 @@ import { format } from 'date-fns';
 export function Timeline() {
   const { flashcards, addXp, updateQuestProgress } = useStore();
 
-  const summaryCards = flashcards.filter(c => c.type !== 'catchup' && c.type !== 'catchmeup').slice().reverse();
-  const catchupCards = flashcards.filter(c => c.type === 'catchup' || c.type === 'catchmeup').slice().reverse();
+  const summaryCards = flashcards.filter(c => c.type !== 'catchup').slice().reverse();
+  const catchupCards = flashcards.filter(c => c.type === 'catchup').slice().reverse();
 
   const handleQaAnswer = (id: string, correct: boolean) => {
     if (correct) {

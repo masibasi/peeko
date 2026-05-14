@@ -1,40 +1,62 @@
 import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import { Eye, EyeOff, Loader2, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export function LoginPage() {
-  const { login } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setMessage('');
     setLoading(true);
 
-    // For demo: create a fake JWT token without backend verification
-    // Any email/password works
-    setTimeout(() => {
-      const fakePayload = {
-        sub: 'demo-user-123',
-        email: email,
-        name: name || email.split('@')[0],
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days
-      };
-      const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-      const payload = btoa(JSON.stringify(fakePayload));
-      const fakeToken = `${header}.${payload}.demo-signature`;
-      
-      login(fakeToken);
-      setLoading(false);
-    }, 500); // Small delay for UX
+    if (isLogin) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      } else {
+        window.location.href = '/dashboard';
+      }
+    } else {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: name ? { data: { name } } : undefined,
+      });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      } else if (data.session) {
+        window.location.href = '/dashboard';
+      } else {
+        setMessage('Check your email to confirm your account.');
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleGuest = async () => {
+    setError('');
+    setMessage('');
+    setGuestLoading(true);
+    const { error } = await supabase.auth.signInAnonymously();
+    if (error) {
+      setError(error.message);
+      setGuestLoading(false);
+    } else {
+      window.location.href = '/session/new';
+    }
   };
 
   return (
@@ -42,16 +64,16 @@ export function LoginPage() {
       {/* Background decoration */}
       <div className="absolute top-20 left-10 w-72 h-72 bg-orange-200 rounded-full blur-3xl opacity-30" />
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-amber-200 rounded-full blur-3xl opacity-30" />
-      
+
       <div className="max-w-md w-full mx-4 relative z-10">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-3xl shadow-2xl shadow-orange-100 p-8 border border-orange-100"
         >
           {/* Logo and Header */}
           <div className="text-center mb-8">
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.8 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", stiffness: 200 }}
@@ -75,6 +97,13 @@ export function LoginPage() {
             </div>
           )}
 
+          {/* Info Message */}
+          {message && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-600 text-sm">
+              {message}
+            </div>
+          )}
+
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
@@ -89,7 +118,7 @@ export function LoginPage() {
                 />
               </div>
             )}
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <input
@@ -141,12 +170,25 @@ export function LoginPage() {
                 onClick={() => {
                   setIsLogin(!isLogin);
                   setError('');
+                  setMessage('');
                 }}
                 className="ml-1 text-orange-600 font-semibold hover:text-orange-700 transition-colors"
               >
                 {isLogin ? 'Sign up' : 'Sign in'}
               </button>
             </p>
+          </div>
+
+          {/* Guest option */}
+          <div className="mt-4 text-center">
+            <button
+              onClick={handleGuest}
+              disabled={guestLoading}
+              className="text-sm text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 mx-auto"
+            >
+              {guestLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Try without an account
+            </button>
           </div>
         </motion.div>
 

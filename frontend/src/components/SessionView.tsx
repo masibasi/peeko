@@ -80,7 +80,9 @@ export function SessionView() {
 
       pollRef.current = setInterval(async () => {
         try {
-          const cardsRes = await fetch(`/api/session/${data.session_id}/cards`);
+          const cardsRes = await fetch(`/api/session/${data.session_id}/cards`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
           const cardsData = await cardsRes.json();
           (cardsData.cards || []).forEach((card: any) => {
             if (seenCardIds.current.has(card.card_id)) return;
@@ -142,7 +144,7 @@ export function SessionView() {
         const sid = sessionIdRef.current;
         if (sid) fetch(`/api/session/${sid}/transcript`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ text: final.trim(), is_final: true }),
         });
       }
@@ -176,7 +178,7 @@ export function SessionView() {
     try {
       await fetch(`/api/session/${sid}/generate-card`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       });
     } catch {}
   };
@@ -188,7 +190,7 @@ export function SessionView() {
     try {
       await fetch(`/api/session/${sid}/catch-me-up`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       });
       if (isRecording) resetCardTimer();
     } catch {}
@@ -203,7 +205,7 @@ export function SessionView() {
       try {
         await fetch(`/api/session/${sid}/end`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         });
       } catch {}
     }

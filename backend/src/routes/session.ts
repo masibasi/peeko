@@ -161,7 +161,7 @@ router.get('/:id/materials', async (req: Request, res: Response, next: NextFunct
 
     const { data, error } = await supabase
       .from('lecture_materials')
-      .select('material_id, filename, status, chunk_count')
+      .select('material_id, filename, status, chunk_count, error_message')
       .eq('session_id', session.session_id)
       .order('created_at', { ascending: true });
 

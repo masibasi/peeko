@@ -14,7 +14,7 @@ export function PeekoCharacter({ size = 'default' }: PeekoCharacterProps) {
     return '🦊';
   };
 
-  const isAlert = peekoState === 'alert' || peekoState === 'puffed';
+  const isAlert = peekoState === 'puffed';
 
   if (size === 'compact') {
     return (
@@ -122,7 +122,7 @@ export function PeekoCharacter({ size = 'default' }: PeekoCharacterProps) {
         <p className="text-xs font-black uppercase tracking-widest text-ink-400">
           {isRecording
             ? 'Listening'
-            : peekoState === 'alert'
+            : peekoState === 'puffed'
             ? 'On alert'
             : peekoState === 'sleepy'
             ? 'Resting'

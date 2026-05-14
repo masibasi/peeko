@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { LandingPage } from './components/LandingPage';
+import { LoginPage } from './components/LoginPage';
 import { NewSessionPage } from './components/NewSessionPage';
 import { SessionView } from './components/SessionView';
 import { PostSessionReport } from './components/PostSessionReport';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 type Page = 'landing' | 'login' | 'dashboard' | 'new-session' | 'session' | 'report';
 
 function AppContent() {
+  const { isAuthenticated, isGuest, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('landing');
 
   const getPageFromPath = (path: string): Page => {
@@ -42,9 +44,34 @@ function AppContent() {
     setCurrentPage(page);
   };
 
+  useEffect(() => {
+    if (loading) return;
+    const protectedPages: Page[] = ['dashboard', 'new-session', 'session', 'report'];
+    if (!isAuthenticated && protectedPages.includes(currentPage)) {
+      window.history.pushState({}, '', '/login');
+      setCurrentPage('login');
+      return;
+    }
+    if (isAuthenticated && isGuest && currentPage === 'dashboard') {
+      window.history.pushState({}, '', '/session/new');
+      setCurrentPage('new-session');
+    }
+  }, [loading, isAuthenticated, isGuest, currentPage]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-50">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🦊</div>
+          <div className="text-gray-500 font-semibold">Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
   switch (currentPage) {
     case 'login':
-      return <Dashboard />;
+      return <LoginPage />;
     case 'dashboard':
       return <Dashboard />;
     case 'new-session':

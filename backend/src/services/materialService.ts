@@ -71,8 +71,9 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
   return buffer.toString('utf-8');
 }
 
-// Embed in batches to avoid request size limits
-const EMBED_BATCH = 32;
+// Embed and insert in batches to avoid request size limits
+const EMBED_BATCH = 16;
+const INSERT_BATCH = 50;
 
 async function embedChunks(chunks: string[]): Promise<number[][]> {
   const embeddings: number[][] = [];
@@ -93,30 +94,46 @@ export async function processMaterial(
   materialId: string,
 ): Promise<void> {
   try {
-    // 1. Upload raw file to Supabase Storage and update file_url
+    console.log(`[processMaterial] start materialId=${materialId} file=${filename} mime=${mimeType} size=${fileBuffer.length}`);
+
+    // 1. Ensure storage bucket exists (idempotent — no-ops if already created)
+    const { error: bucketError } = await supabase.storage.createBucket('lecture-materials', { public: false });
+    if (bucketError && !bucketError.message.includes('already exists')) {
+      console.warn(`[processMaterial] bucket creation warning: ${bucketError.message}`);
+    }
+    console.log('[processMaterial] step 1 done: bucket ready');
+
+    // 2. Upload raw file to Supabase Storage and update file_url
     const storagePath = `sessions/${sessionId}/${Date.now()}-${filename}`;
     const { error: uploadError } = await supabase.storage
       .from('lecture-materials')
       .upload(storagePath, fileBuffer, { contentType: mimeType, upsert: false });
     if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`);
+    console.log('[processMaterial] step 2 done: file uploaded');
 
     await supabase
       .from('lecture_materials')
       .update({ file_url: storagePath })
       .eq('material_id', materialId);
 
-    // 2. Parse text from file
+    // 3. Parse text from file
+    console.log('[processMaterial] step 3: extracting text...');
     const text = await extractText(fileBuffer, mimeType);
     if (!text.trim()) throw new Error('No extractable text found in file');
+    console.log(`[processMaterial] step 3 done: extracted ${text.length} chars`);
 
-    // 3. Chunk the text
+    // 4. Chunk the text
     const chunks = chunkText(text);
     if (chunks.length === 0) throw new Error('Chunking produced no chunks');
+    console.log(`[processMaterial] step 4 done: ${chunks.length} chunks`);
 
-    // 4. Embed all chunks
+    // 5. Embed all chunks
+    console.log('[processMaterial] step 5: embedding...');
     const embeddings = await embedChunks(chunks);
+    console.log('[processMaterial] step 5 done: embeddings ready');
 
-    // 5. Bulk insert material_chunks
+    // 6. Bulk insert material_chunks in batches to stay within Supabase body size limits
+    console.log('[processMaterial] step 6: inserting chunks...');
     const rows = chunks.map((chunkText, i) => ({
       material_id: materialId,
       session_id: sessionId,
@@ -125,20 +142,25 @@ export async function processMaterial(
       embedding: JSON.stringify(embeddings[i]),
     }));
 
-    const { error: chunkError } = await supabase.from('material_chunks').insert(rows);
-    if (chunkError) throw new Error(`Failed to insert chunks: ${chunkError.message}`);
+    for (let i = 0; i < rows.length; i += INSERT_BATCH) {
+      const { error: chunkError } = await supabase.from('material_chunks').insert(rows.slice(i, i + INSERT_BATCH));
+      if (chunkError) throw new Error(`Failed to insert chunks batch ${i}: ${chunkError.message}`);
+    }
+    console.log('[processMaterial] step 6 done: all chunks inserted');
 
-    // 6. Update lecture_materials: status = ready, chunk_count
+    // 7. Update lecture_materials: status = ready, chunk_count
     await supabase
       .from('lecture_materials')
       .update({ status: 'ready', chunk_count: chunks.length })
       .eq('material_id', materialId);
 
-    // 7. Set sessions.has_materials = true
+    // 8. Set sessions.has_materials = true
     await supabase
       .from('sessions')
       .update({ has_materials: true })
       .eq('session_id', sessionId);
+
+    console.log(`[processMaterial] done: ${chunks.length} chunks stored, status=ready`);
   } catch (err) {
     // On any error, mark as failed
     await supabase

@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { getGoogleToken, setGoogleToken, removeGoogleToken, isJwtExpired, decodeJwt } from '../lib/auth';
+import { supabase } from '../lib/supabase';
 
 export interface User {
   email?: string;
@@ -13,8 +13,8 @@ export interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAuthenticated: boolean;
+  isGuest: boolean;
   token: string | null;
-  login: (token: string) => void;
   logout: () => void;
 }
 
@@ -22,57 +22,54 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   isAuthenticated: false,
+  isGuest: false,
   token: null,
-  login: () => {},
   logout: () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [token, setTokenState] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [isGuest, setIsGuest] = useState(false);
 
-  // Check for stored token on mount
   useEffect(() => {
-    const storedToken = getGoogleToken();
-    if (storedToken) {
-      if (isJwtExpired(storedToken)) {
-        removeGoogleToken();
-        setUser(null);
-        setLoading(false);
-      } else {
-        handleToken(storedToken);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setUser({
+          email: session.user.email,
+          name: session.user.user_metadata?.name,
+          picture: session.user.user_metadata?.avatar_url,
+          sub: session.user.id,
+        });
+        setToken(session.access_token);
+        setIsGuest(session.user.is_anonymous ?? false);
       }
-    } else {
       setLoading(false);
-    }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setUser({
+          email: session.user.email,
+          name: session.user.user_metadata?.name,
+          picture: session.user.user_metadata?.avatar_url,
+          sub: session.user.id,
+        });
+        setToken(session.access_token);
+        setIsGuest(session.user.is_anonymous ?? false);
+      } else {
+        setUser(null);
+        setToken(null);
+        setIsGuest(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const handleToken = (token: string) => {
-    setGoogleToken(token);
-    setTokenState(token);
-    
-    const decoded = decodeJwt(token);
-    if (decoded) {
-      setUser({
-        email: decoded.email,
-        name: decoded.name,
-        picture: decoded.picture,
-        sub: decoded.sub,
-      });
-    }
-    setLoading(false);
-  };
-
-  const login = (token: string) => {
-    handleToken(token);
-  };
-
-  const logout = () => {
-    removeGoogleToken();
-    setTokenState(null);
-    setUser(null);
-    fetch('/api/auth/logout', { method: 'POST' });
+  const logout = async () => {
+    await supabase.auth.signOut();
   };
 
   return (
@@ -81,8 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         loading,
         isAuthenticated: !!user,
+        isGuest,
         token,
-        login,
         logout,
       }}
     >

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
+import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'motion/react';
 import { format } from 'date-fns';
 import { Trophy, RefreshCw, BookOpen, Clock, ArrowLeft, Zap } from 'lucide-react';
@@ -14,6 +15,7 @@ interface BackendCard {
 
 export function PostSessionReport() {
   const { focusScore, successfulRecoveries, flashcards } = useStore();
+  const { token } = useAuth();
 
   const pathParts = window.location.pathname.split('/');
   const sessionIdFromUrl = pathParts[2] || null;
@@ -23,7 +25,9 @@ export function PostSessionReport() {
 
   useEffect(() => {
     if (!sessionIdFromUrl) return;
-    fetch(`/api/session/${sessionIdFromUrl}/notebook`)
+    fetch(`/api/session/${sessionIdFromUrl}/notebook`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
       .then(r => r.json())
       .then(data => setCards(data.cards || []))
       .catch(console.error)

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../store/useStore';
 import { motion } from 'motion/react';
@@ -13,7 +13,7 @@ interface Session {
 }
 
 export function Dashboard() {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const { xp, level, recoveryStreak, quests } = useStore();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +23,9 @@ export function Dashboard() {
 
   const fetchSessions = async () => {
     try {
-      const res = await fetch('/api/session');
+      const res = await fetch('/api/session', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setSessions(data.sessions || []);
@@ -36,7 +38,10 @@ export function Dashboard() {
     e.stopPropagation();
     if (!confirm('Delete this session?')) return;
     try {
-      await fetch(`/api/session/${sessionId}`, { method: 'DELETE' });
+      await fetch(`/api/session/${sessionId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setSessions(prev => prev.filter(s => s.id !== sessionId));
     } catch {}
   };
