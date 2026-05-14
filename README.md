@@ -16,11 +16,11 @@ Peeko listens to your live lecture and builds a timeline of AI-generated summary
 1. **Log in** with your email address.
 2. **New Session**: optionally drag-drop a lecture material as the input. Peeko will index it and use it to ground AI summaries. Click **Skip & Start** to begin without materials.
 3. **During the lecture**: Peeko listens through your microphone. Every 5 minutes, a summary card is generated and added to the timeline on the left sidebar. Each card shows a title and key bullets for the missing content.
-4. **Zoned out?** Click **Catch Me Up**. You'll instantly see:
-   - **Now**: what the professor is currently discussing
-   - **You likely missed**: key concepts from while you were gone
-5. **Peeko Companion (PiP)**: click **Open Companion** to launch Peeko the fennec fox in a floating Picture-in-Picture window. It stays visible on top of any tab — YouTube, Instagram, anywhere — showing live keyword bubbles from the latest card. Click the fox to trigger Catch Me Up without switching back to the Peeko tab.
-6. **After class**: revisit any session from the Dashboard. Open the full Notebook view to read all cards in order.
+4. **Zoned out?** — Click **Catch Me Up**. You'll instantly see:
+   - **Now** — what the professor is currently discussing
+   - **You likely missed** — key concepts from while you were gone
+5. **Peeko Companion (PiP)** — click **Open Companion** to launch Peeko the fennec fox in a floating Picture-in-Picture window. It stays visible on top of any tab — YouTube, Instagram, anywhere — showing live keyword bubbles from the latest card. Click the fox to trigger Catch Me Up without switching back to the Peeko tab.
+6. **After class** — revisit any session from the Dashboard. Open the full Notebook view to read all cards in order.
 
 ---
 
