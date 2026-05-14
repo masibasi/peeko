@@ -1,4 +1,4 @@
-# Peeko — Real-Time Lecture Recovery Study Companion
+# Peeko — Real-Time Lecture Recovery System
 
 Peeko listens to your live lecture and builds a timeline of AI-generated summary cards as it happens. When you zone out and snap back, one tap tells you exactly what the professor is discussing, what you missed, and the minimum you need to follow along right now.
 
@@ -51,4 +51,3 @@ Peeko listens to your live lecture and builds a timeline of AI-generated summary
 - [Voyage AI Embeddings](https://docs.voyageai.com/docs/embeddings) — `voyage-3-lite` used for RAG lecture material retrieval
 - [Supabase pgvector](https://supabase.com/docs/guides/ai/vector-columns) — cosine similarity search over lecture material chunks
 - [Document Picture-in-Picture API](https://developer.chrome.com/docs/web-platform/document-picture-in-picture) — always-on-top companion window (Chrome 116+)
-- [Build4SC 2025](https://build4sc.com) — Design — Human-Centric AI track (GRIDS × Viterbi)
