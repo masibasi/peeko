@@ -1,6 +1,4 @@
-# Peeko — Real-Time Lecture Recovery System
-
-> Not a note-taking tool. A recovery system.
+# Peeko — Real-Time Lecture Recovery Study Companion
 
 Peeko listens to your live lecture and builds a timeline of AI-generated summary cards as it happens. When you zone out and snap back, one tap tells you exactly what the professor is discussing, what you missed, and the minimum you need to follow along right now.
 
@@ -8,9 +6,8 @@ Peeko listens to your live lecture and builds a timeline of AI-generated summary
 
 ## Try the Demo
 
-**[peeko-pink.vercel.app](https://peeko-pink.vercel.app/)** *(requires Chrome 116+ for PiP companion)*
+**[peeko-pink.vercel.app](https://peeko-pink.vercel.app/)** 
 
-> Login with Google, start a session, and click **Catch Me Up** to see the recovery system in action.
 
 ---
 
@@ -34,7 +31,7 @@ Peeko listens to your live lecture and builds a timeline of AI-generated summary
 | Layer | Technology |
 |---|---|
 | Frontend | React 19 · Vite · TailwindCSS 4 · Zustand · Motion |
-| Backend | Node.js · Express · WebSocket (`ws`) |
+| Backend | Node.js · Express · WebSocket |
 | Database | Supabase (PostgreSQL + pgvector) |
 | Auth | Supabase Auth — Google OAuth |
 | Transcription | Deepgram Streaming STT |
