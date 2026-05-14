@@ -1,4 +1,4 @@
-# Peeko — Real-Time Lecture Recovery System
+# 🦊 Peeko
 
 Peeko listens to your live lecture and builds a timeline of AI-generated summary cards as it happens. When you zone out and snap back, one tap tells you exactly what the professor is discussing, what you missed, and the minimum you need to follow along right now.
 
@@ -13,14 +13,12 @@ Peeko listens to your live lecture and builds a timeline of AI-generated summary
 
 ## How to Use
 
-1. **Log in** with your Google account.
-2. **New Session** — optionally drag-drop a PDF, DOCX, or TXT lecture handout. Peeko will index it and use it to ground AI summaries. Click **Skip & Start** to begin without materials.
-3. **During the lecture** — Peeko listens through your microphone. Every 5 minutes, a summary card is generated and added to the timeline on the left sidebar. Each card shows a title, key bullets, keywords, and any Q&A the professor raised.
-4. **Zoned out?** — Click **Catch Me Up** (or click the Peeko fox in the floating window). You'll instantly see:
+1. **Log in** with your email address.
+2. **New Session**: optionally drag-drop a lecture material as the input. Peeko will index it and use it to ground AI summaries. Click **Skip & Start** to begin without materials.
+3. **During the lecture**: Peeko listens through your microphone. Every 5 minutes, a summary card is generated and added to the timeline on the left sidebar. Each card shows a title and key bullets for the missing content.
+4. **Zoned out?** — Click **Catch Me Up**. You'll instantly see:
    - **Now** — what the professor is currently discussing
    - **You likely missed** — key concepts from while you were gone
-   - **Read first** — which cards to skim to get back up to speed
-   - **Quick rejoin tip** — the minimum context to follow along right now
 5. **Peeko Companion (PiP)** — click **Open Companion** to launch Peeko the fennec fox in a floating Picture-in-Picture window. It stays visible on top of any tab — YouTube, Instagram, anywhere — showing live keyword bubbles from the latest card. Click the fox to trigger Catch Me Up without switching back to the Peeko tab.
 6. **After class** — revisit any session from the Dashboard. Open the full Notebook view to read all cards in order.
 
