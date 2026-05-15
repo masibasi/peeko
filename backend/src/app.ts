@@ -9,11 +9,12 @@ const app = express();
 
 app.use(cors({ origin: env.FRONTEND_URL, credentials: true }));
 app.use(express.json());
+
+app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
 app.use(authMiddleware);
 
 app.use('/session', sessionRouter);
-
-app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.use(errorHandler);
 
